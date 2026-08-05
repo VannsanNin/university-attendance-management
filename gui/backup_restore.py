@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from gui import theme
 from tkinter import messagebox, filedialog
 from datetime import datetime
 import os
@@ -6,7 +7,7 @@ import threading
 
 class BackupRestoreView(ctk.CTkFrame):
     def __init__(self, db, parent):
-        super().__init__(parent)
+        super().__init__(parent, fg_color=theme.c("bg_dark"))
         self.db = db
         self.auto_timer = None
         self.pack(fill="both", expand=True)
@@ -45,7 +46,7 @@ class BackupRestoreView(ctk.CTkFrame):
         ctk.CTkLabel(right, text="Warning: Restoring will overwrite current data!",
                      text_color="red", font=ctk.CTkFont(size=12)).pack(pady=5)
         ctk.CTkButton(right, text="Select Backup File & Restore",
-                      command=self.restore_backup, fg_color="#CD5C5C",
+                      command=self.restore_backup, fg_color=theme.c("lightcoral"),
                       height=40).pack(fill="x", padx=20, pady=10)
 
         self.log_frame = ctk.CTkScrollableFrame(self)

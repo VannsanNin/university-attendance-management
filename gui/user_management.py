@@ -1,27 +1,18 @@
 import customtkinter as ctk
+from gui import theme
 from tkinter import messagebox, ttk
 
 
 class UserManagementView(ctk.CTkFrame):
     def __init__(self, db, parent):
-        super().__init__(parent, fg_color="#0F172A")  # Slate 900 background
+        super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
         self.pack(fill="both", expand=True)
         self.selected_user_id = None
         self._search_after_id = None
 
         # Color Palette
-        self.colors = {
-            "bg_dark": "#0F172A",
-            "card_bg": "#1E293B",
-            "card_border": "#334155",
-            "primary": "#0EA5E9",
-            "primary_hover": "#0284C7",
-            "danger": "#EF4444",
-            "danger_hover": "#DC2626",
-            "text_main": "#F8FAFC",
-            "text_muted": "#94A3B8"
-        }
+        self.colors = theme.colors
 
         self.build_ui()
         self.after(50, self.load_users)
@@ -187,8 +178,8 @@ class UserManagementView(ctk.CTkFrame):
             text="Edit",
             width=70,
             height=34,
-            fg_color="#334155",
-            hover_color="#475569",
+            fg_color=theme.c("neutral_btn"),
+            hover_color=theme.c("neutral_hover"),
             command=self._edit_selected_row
         ).pack(side="left", padx=2)
 
@@ -197,8 +188,8 @@ class UserManagementView(ctk.CTkFrame):
             text="Reset PW",
             width=80,
             height=34,
-            fg_color="#334155",
-            hover_color="#475569",
+            fg_color=theme.c("neutral_btn"),
+            hover_color=theme.c("neutral_hover"),
             command=self._reset_selected_row
         ).pack(side="left", padx=2)
 
@@ -222,29 +213,29 @@ class UserManagementView(ctk.CTkFrame):
         # Configure Table Colors & Geometry
         style.configure(
             "Treeview",
-            background="#1E293B",
-            foreground="#F8FAFC",
-            fieldbackground="#1E293B",
+            background=theme.c("table_bg"),
+            foreground=theme.c("table_fg"),
+            fieldbackground=theme.c("table_bg"),
             rowheight=36,
             font=("Segoe UI", 10),
             borderwidth=0
         )
         style.configure(
             "Treeview.Heading",
-            background="#0F172A",
-            foreground="#94A3B8",
+            background=theme.c("table_head_bg"),
+            foreground=theme.c("table_head_fg"),
             font=("Segoe UI", 10, "bold"),
             relief="flat",
             padding=6
         )
         style.map(
             "Treeview",
-            background=[("selected", "#334155")],
-            foreground=[("selected", "#FFFFFF")]
+            background=[("selected", theme.c("table_selected"))],
+            foreground=[("selected", theme.c("table_selected_fg"))]
         )
         style.map(
             "Treeview.Heading",
-            background=[("active", "#1E293B")]
+            background=[("active", theme.c("table_head_active"))]
         )
 
         columns = ("id", "username", "role", "email", "phone", "active", "last_login")

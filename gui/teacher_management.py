@@ -1,28 +1,17 @@
 import customtkinter as ctk
+from gui import theme
 from tkinter import messagebox, ttk
 
 
 class TeacherManagementView(ctk.CTkFrame):
     def __init__(self, db, parent):
-        super().__init__(parent, fg_color="#0F172A")  # Slate 900 background
+        super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
         self.selected_teacher_id = None
         self.pack(fill="both", expand=True)
 
         # Unified Color Palette Tokens
-        self.colors = {
-            "bg_dark": "#0F172A",
-            "card_bg": "#1E293B",
-            "card_border": "#334155",
-            "primary": "#0EA5E9",
-            "primary_hover": "#0284C7",
-            "danger": "#EF4444",
-            "danger_hover": "#DC2626",
-            "neutral_btn": "#334155",
-            "neutral_hover": "#475569",
-            "text_main": "#F8FAFC",
-            "text_muted": "#94A3B8"
-        }
+        self.colors = theme.colors
 
         self.build_ui()
         self.after(50, self.load_teachers)
@@ -176,29 +165,29 @@ class TeacherManagementView(ctk.CTkFrame):
 
         style.configure(
             "Teacher.Treeview",
-            background="#1E293B",
-            foreground="#F8FAFC",
-            fieldbackground="#1E293B",
+            background=theme.c("table_bg"),
+            foreground=theme.c("table_fg"),
+            fieldbackground=theme.c("table_bg"),
             rowheight=36,
             font=("Segoe UI", 10),
             borderwidth=0
         )
         style.configure(
             "Teacher.Treeview.Heading",
-            background="#0F172A",
-            foreground="#94A3B8",
+            background=theme.c("table_head_bg"),
+            foreground=theme.c("table_head_fg"),
             font=("Segoe UI", 10, "bold"),
             relief="flat",
             padding=6
         )
         style.map(
             "Teacher.Treeview",
-            background=[("selected", "#334155")],
-            foreground=[("selected", "#FFFFFF")]
+            background=[("selected", theme.c("table_selected"))],
+            foreground=[("selected", theme.c("table_selected_fg"))]
         )
         style.map(
             "Teacher.Treeview.Heading",
-            background=[("active", "#1E293B")]
+            background=[("active", theme.c("table_head_active"))]
         )
 
         columns = ("id", "name", "gender", "department", "position", "phone", "email")

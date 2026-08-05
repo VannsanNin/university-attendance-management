@@ -1,29 +1,28 @@
 import customtkinter as ctk
 
+from gui import theme
+
 
 class Sidebar(ctk.CTkFrame):
     def __init__(self, parent, user, on_navigate, on_change_password, on_logout):
-        super().__init__(parent, fg_color="#0F172A", width=240, corner_radius=0)
+        super().__init__(parent, fg_color=theme.c("sidebar_bg"), width=240, corner_radius=0)
         self.user = user
         self.on_navigate = on_navigate
         self.on_change_password_cb = on_change_password
         self.on_logout_cb = on_logout
 
         self.nav_buttons = {}
-        self.colors = {
-            "bg_dark": "#0F172A",
-            "card_bg": "#1E293B",
-            "active_bg": "#0EA5E9",
-            "active_text": "#FFFFFF",
-            "hover_bg": "#1E293B",
-            "text_main": "#F8FAFC",
-            "text_muted": "#94A3B8",
-            "danger": "#EF4444",
-            "danger_hover": "#DC2626",
-            "border": "#1E293B",
-        }
+        self.colors = theme.colors
 
         self.pack(side="left", fill="y", expand=False)
+        self.build_ui()
+
+    def apply_theme(self):
+        self.colors = theme.colors
+        self.configure(fg_color=theme.c("sidebar_bg"))
+        for child in self.winfo_children():
+            child.destroy()
+        self.nav_buttons = {}
         self.build_ui()
 
     def build_ui(self):

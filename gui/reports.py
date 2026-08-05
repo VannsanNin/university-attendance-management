@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from gui import theme
 from tkinter import messagebox, filedialog, ttk
 from datetime import date, datetime
 import pandas as pd
@@ -7,26 +8,14 @@ import os
 
 class ReportsView(ctk.CTkFrame):
     def __init__(self, db, parent):
-        super().__init__(parent, fg_color="#0F172A")  # Slate 900 background
+        super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
         self.report_data = None
         self.current_report_type = "Daily"
         self.pack(fill="both", expand=True)
 
         # Unified Color Palette Tokens
-        self.colors = {
-            "bg_dark": "#0F172A",
-            "card_bg": "#1E293B",
-            "card_border": "#334155",
-            "primary": "#0EA5E9",
-            "primary_hover": "#0284C7",
-            "success": "#10B981",
-            "success_hover": "#059669",
-            "neutral_btn": "#334155",
-            "neutral_hover": "#475569",
-            "text_main": "#F8FAFC",
-            "text_muted": "#94A3B8"
-        }
+        self.colors = theme.colors
 
         self._build_header()
         self._build_main()
@@ -155,7 +144,7 @@ class ReportsView(ctk.CTkFrame):
             ).pack(side="left", padx=3)
 
         # Summary Stats Buffer Frame (used dynamically by Student Report)
-        self.summary_stats_frame = ctk.CTkFrame(result_card, fg_color="#0F172A", corner_radius=8)
+        self.summary_stats_frame = ctk.CTkFrame(result_card, fg_color=theme.c("bg_dark"), corner_radius=8)
         self.summary_stats_frame.pack_forget()
 
         # Table Wrapper Frame
@@ -168,29 +157,29 @@ class ReportsView(ctk.CTkFrame):
 
         style.configure(
             "Report.Treeview",
-            background="#1E293B",
-            foreground="#F8FAFC",
-            fieldbackground="#1E293B",
+            background=theme.c("table_bg"),
+            foreground=theme.c("table_fg"),
+            fieldbackground=theme.c("table_bg"),
             rowheight=36,
             font=("Segoe UI", 10),
             borderwidth=0
         )
         style.configure(
             "Report.Treeview.Heading",
-            background="#0F172A",
-            foreground="#94A3B8",
+            background=theme.c("table_head_bg"),
+            foreground=theme.c("table_head_fg"),
             font=("Segoe UI", 10, "bold"),
             relief="flat",
             padding=6
         )
         style.map(
             "Report.Treeview",
-            background=[("selected", "#334155")],
-            foreground=[("selected", "#FFFFFF")]
+            background=[("selected", theme.c("table_selected"))],
+            foreground=[("selected", theme.c("table_selected_fg"))]
         )
         style.map(
             "Report.Treeview.Heading",
-            background=[("active", "#1E293B")]
+            background=[("active", theme.c("table_head_active"))]
         )
 
         self.tree = ttk.Treeview(self.table_wrapper, show="headings", style="Report.Treeview", selectmode="browse")

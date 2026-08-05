@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from gui import theme
 from tkinter import messagebox, filedialog, ttk
 from datetime import date, datetime
 import pandas as pd
@@ -7,7 +8,7 @@ import os
 
 class AttendanceTakeView(ctk.CTkFrame):
     def __init__(self, user, db, parent):
-        super().__init__(parent, fg_color="#0F172A")  # Slate 900 background
+        super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.user = user
         self.db = db
         self.current_students = []
@@ -15,21 +16,7 @@ class AttendanceTakeView(ctk.CTkFrame):
         self.pack(fill="both", expand=True)
 
         # Unified Color Palette
-        self.colors = {
-            "bg_dark": "#0F172A",
-            "card_bg": "#1E293B",
-            "card_border": "#334155",
-            "primary": "#0EA5E9",
-            "primary_hover": "#0284C7",
-            "success": "#10B981",
-            "success_hover": "#059669",
-            "danger": "#EF4444",
-            "danger_hover": "#DC2626",
-            "neutral_btn": "#334155",
-            "neutral_hover": "#475569",
-            "text_main": "#F8FAFC",
-            "text_muted": "#94A3B8"
-        }
+        self.colors = theme.colors
 
         self._build_header()
         self._build_top_bar()
@@ -139,7 +126,7 @@ class AttendanceTakeView(ctk.CTkFrame):
         )
         list_container.pack(fill="both", expand=True, padx=30, pady=(0, 15))
 
-        header_frame = ctk.CTkFrame(list_container, fg_color="#0F172A", corner_radius=8)
+        header_frame = ctk.CTkFrame(list_container, fg_color=theme.c("bg_dark"), corner_radius=8)
         header_frame.pack(fill="x", padx=15, pady=(15, 10))
 
         for col, text, w in [
@@ -258,7 +245,7 @@ class AttendanceTakeView(ctk.CTkFrame):
         self.current_students = students
 
         for s in students:
-            row = ctk.CTkFrame(self.students_frame, fg_color="#0F172A", corner_radius=8)
+            row = ctk.CTkFrame(self.students_frame, fg_color=theme.c("bg_dark"), corner_radius=8)
             row.pack(fill="x", pady=3)
 
             ctk.CTkLabel(
@@ -382,24 +369,12 @@ class AttendanceTakeView(ctk.CTkFrame):
 
 class AttendanceView(ctk.CTkFrame):
     def __init__(self, db, parent, user=None):
-        super().__init__(parent, fg_color="#0F172A")  # Slate 900 background
+        super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
         self.user = user
         self.pack(fill="both", expand=True)
 
-        self.colors = {
-            "bg_dark": "#0F172A",
-            "card_bg": "#1E293B",
-            "card_border": "#334155",
-            "primary": "#0EA5E9",
-            "primary_hover": "#0284C7",
-            "danger": "#EF4444",
-            "danger_hover": "#DC2626",
-            "neutral_btn": "#334155",
-            "neutral_hover": "#475569",
-            "text_main": "#F8FAFC",
-            "text_muted": "#94A3B8"
-        }
+        self.colors = theme.colors
 
         self._build_header()
         self._build_filters()
@@ -563,29 +538,29 @@ class AttendanceView(ctk.CTkFrame):
 
         style.configure(
             "Attendance.Treeview",
-            background="#1E293B",
-            foreground="#F8FAFC",
-            fieldbackground="#1E293B",
+            background=theme.c("table_bg"),
+            foreground=theme.c("table_fg"),
+            fieldbackground=theme.c("table_bg"),
             rowheight=36,
             font=("Segoe UI", 10),
             borderwidth=0
         )
         style.configure(
             "Attendance.Treeview.Heading",
-            background="#0F172A",
-            foreground="#94A3B8",
+            background=theme.c("table_head_bg"),
+            foreground=theme.c("table_head_fg"),
             font=("Segoe UI", 10, "bold"),
             relief="flat",
             padding=6
         )
         style.map(
             "Attendance.Treeview",
-            background=[("selected", "#334155")],
-            foreground=[("selected", "#FFFFFF")]
+            background=[("selected", theme.c("table_selected"))],
+            foreground=[("selected", theme.c("table_selected_fg"))]
         )
         style.map(
             "Attendance.Treeview.Heading",
-            background=[("active", "#1E293B")]
+            background=[("active", theme.c("table_head_active"))]
         )
 
         columns = ("date", "time", "sid", "student_name", "course_code", "status")

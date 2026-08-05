@@ -1,9 +1,10 @@
 import customtkinter as ctk
+from gui import theme
 from datetime import date
 
 class StudentReportView(ctk.CTkFrame):
     def __init__(self, db, parent, user):
-        super().__init__(parent)
+        super().__init__(parent, fg_color=theme.c("bg_dark"))
         self.db = db
         self.user = user
         self.pack(fill="both", expand=True)
@@ -34,12 +35,12 @@ class StudentReportView(ctk.CTkFrame):
         perm_pct = round(summary.get("permission_count", 0) / total * 100, 1)
 
         labels = [
-            ("Total Classes", str(summary.get("total", 0)), "#FFFFFF"),
-            ("Present", f"{present_pct}%", "#2E8B57"),
-            ("Absent", f"{absent_pct}%", "#CD5C5C"),
-            ("Late", f"{late_pct}%", "#DAA520"),
-            ("Permission", f"{perm_pct}%", "#4682B4"),
-            ("Overall", f"{summary.get('percentage', 0)}%", "#10B981" if summary.get('percentage', 0) >= 75 else "#F59E0B"),
+            ("Total Classes", str(summary.get("total", 0)), theme.c("text_bright")),
+            ("Present", f"{present_pct}%", theme.c("green")),
+            ("Absent", f"{absent_pct}%", theme.c("lightcoral")),
+            ("Late", f"{late_pct}%", theme.c("gold")),
+            ("Permission", f"{perm_pct}%", theme.c("steelblue")),
+            ("Overall", f"{summary.get('percentage', 0)}%", theme.c("success") if summary.get('percentage', 0) >= 75 else theme.c("warning")),
         ]
 
         for i, (label, value, color) in enumerate(labels):
@@ -63,9 +64,9 @@ class StudentReportView(ctk.CTkFrame):
                 row = ctk.CTkFrame(scroll)
                 row.pack(fill="x", pady=1)
 
-                status_colors = {"Present": "#2E8B57", "Absent": "#CD5C5C",
-                                 "Late": "#DAA520", "Permission": "#4682B4"}
-                color = status_colors.get(r["status"], "#FFFFFF")
+                status_colors = {"Present": theme.c("green"), "Absent": theme.c("lightcoral"),
+                                 "Late": theme.c("gold"), "Permission": theme.c("steelblue")}
+                color = status_colors.get(r["status"], theme.c("text_bright"))
 
                 ctk.CTkLabel(row, text=r.get("attendance_date", ""), width=120).pack(side="left", padx=5)
                 ctk.CTkLabel(row, text=r.get("course_code", ""), width=100).pack(side="left", padx=5)

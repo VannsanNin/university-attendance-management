@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from gui import theme
 from tkinter import messagebox
 import os
 import pickle
@@ -19,7 +20,7 @@ except ImportError:
 
 class FaceRecognitionView(ctk.CTkFrame):
     def __init__(self, db, parent):
-        super().__init__(parent)
+        super().__init__(parent, fg_color=theme.c("bg_dark"))
         self.db = db
         self.pack(fill="both", expand=True)
 
@@ -72,7 +73,7 @@ class FaceRecognitionView(ctk.CTkFrame):
         self.load_courses()
         ctk.CTkButton(right, text="Start Face Recognition",
                       command=self.start_recognition,
-                      fg_color="#2E8B57").pack(pady=10)
+                      fg_color=theme.c("green")).pack(pady=10)
 
         self.log_frame = ctk.CTkScrollableFrame(self)
         self.log_frame.pack(fill="both", expand=True, padx=40, pady=10)
@@ -135,7 +136,7 @@ class FaceRecognitionView(ctk.CTkFrame):
         if face_encoding is not None:
             self.db.save_face_encoding(student["id"], face_encoding)
             self.status_label.configure(text=f"Face registered for {student['full_name']}",
-                                        text_color="#2E8B57")
+                                        text_color=theme.c("green"))
             self.log(f"Registered: {student['full_name']} ({student['student_id']})")
         else:
             self.status_label.configure(text="Registration cancelled", text_color="red")

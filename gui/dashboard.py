@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 from database.db_manager import DatabaseManager
 from datetime import date
+from gui import theme
 from gui.sidebar import Sidebar
 
 class DashboardWindow(ctk.CTkToplevel):
@@ -23,13 +24,21 @@ class DashboardWindow(ctk.CTkToplevel):
             on_logout=self.logout,
         )
 
-        self.content_frame = ctk.CTkFrame(self, corner_radius=0)
+        self.content_frame = ctk.CTkFrame(self, corner_radius=0, fg_color=theme.c("bg_dark"))
         self.content_frame.pack(side="right", fill="both", expand=True)
 
         self.frames = {}
+        self.current_view = "dashboard"
         self.show_frame("dashboard")
 
+    def apply_theme(self):
+        """Rebuild sidebar + current view after the theme mode changes."""
+        self.sidebar.apply_theme()
+        self.content_frame.configure(fg_color=theme.c("bg_dark"))
+        self.show_frame(self.current_view)
+
     def show_frame(self, name):
+        self.current_view = name
         self.sidebar.set_active(name)
 
         for widget in self.content_frame.winfo_children():
@@ -62,7 +71,7 @@ class DashboardWindow(ctk.CTkToplevel):
             "attendance": (AttendanceTakeView, [self.user, self.db, self.content_frame]),
             "reports": (ReportsView, [self.db, self.content_frame]),
             "academic_year": (AcademicYearView, [self.db, self.content_frame]),
-            "settings": (SettingsView, [self.db, self.content_frame]),
+            "settings": (SettingsView, [self.db, self.content_frame, self]),
             "take_attendance": (AttendanceTakeView, [self.user, self.db, self.content_frame]),
             "attendance_view": (AttendanceView, [self.db, self.content_frame]),
             "attendance_report": (StudentReportView, [self.db, self.content_frame, self.user]),
@@ -123,16 +132,18 @@ class DashboardWindow(ctk.CTkToplevel):
 
     def logout(self):
         self.destroy()
+        self.parent.apply_theme()
         self.parent.deiconify()
 
     def on_close(self):
         self.destroy()
+        self.parent.apply_theme()
         self.parent.deiconify()
 
 
 class StudentProfileView(ctk.CTkFrame):
     def __init__(self, db, parent, user):
-        super().__init__(parent)
+        super().__init__(parent, fg_color=theme.c("bg_dark"))
         self.db = db
         self.user = user
         self.pack(fill="both", expand=True)
@@ -180,7 +191,7 @@ class StudentProfileView(ctk.CTkFrame):
             summary = db.get_attendance_summary(student_id=student["id"])
             ctk.CTkLabel(info_frame, text=f"Overall Attendance: {summary.get('percentage', 0)}%",
                          font=ctk.CTkFont(size=16, weight="bold"),
-                         text_color="#10B981" if summary.get('percentage', 0) >= 75 else "#F59E0B"
+                         text_color=theme.c("success") if summary.get('percentage', 0) >= 75 else theme.c("warning")
                          ).grid(row=len(fields), column=0, pady=10)
         else:
             ctk.CTkLabel(self, text="Student profile not found. Contact admin to link your account.",
@@ -189,7 +200,7 @@ class StudentProfileView(ctk.CTkFrame):
 
 class MyCoursesView(ctk.CTkFrame):
     def __init__(self, db, parent, user):
-        super().__init__(parent)
+        super().__init__(parent, fg_color=theme.c("bg_dark"))
         self.db = db
         self.user = user
         self.pack(fill="both", expand=True)
@@ -215,8 +226,8 @@ class MyCoursesView(ctk.CTkFrame):
             return
 
         for c in courses:
-            card = ctk.CTkFrame(self, fg_color="#1E1E2E", corner_radius=8,
-                                border_width=1, border_color="#2A2A3C")
+            card = ctk.CTkFrame(self, fg_color=theme.c("card_alt"), corner_radius=8,
+                                border_width=1, border_color=theme.c("border_alt"))
             card.pack(fill="x", padx=40, pady=5)
 
             info = f"{c['course_code']} - {c['course_name']}"

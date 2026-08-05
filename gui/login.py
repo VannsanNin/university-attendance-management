@@ -14,7 +14,10 @@ class LoginWindow(ctk.CTk):
         self.resizable(False, False)
 
         # Apply Global Theme Defaults
-        ctk.set_appearance_mode("Dark")
+        from gui import theme
+
+        saved_theme = self.db.get_setting("theme") or "Dark"
+        theme.set_mode(saved_theme)
         ctk.set_default_color_theme("blue")
 
         # Configure Main Grid Structure (Left Sidebar | Right Form)
@@ -27,6 +30,17 @@ class LoginWindow(ctk.CTk):
 
         self.dashboard = None
 
+    def apply_theme(self):
+        """Rebuilds the window UI after the theme mode changes (e.g. on logout)."""
+        from gui import theme
+
+        saved_theme = self.db.get_setting("theme") or "Dark"
+        theme.set_mode(saved_theme)
+        for child in self.winfo_children():
+            child.destroy()
+        self._build_sidebar()
+        self._build_form()
+
     def _toggle_password_visibility(self):
         if self.show_password_var.get():
             self.password_entry.configure(show="")
@@ -35,7 +49,9 @@ class LoginWindow(ctk.CTk):
 
     def _build_sidebar(self):
         """Creates the branded visual left panel."""
-        sidebar = ctk.CTkFrame(self, corner_radius=0, fg_color="#1E1E2E")
+        from gui import theme
+
+        sidebar = ctk.CTkFrame(self, corner_radius=0, fg_color=theme.c("login_sidebar"))
         sidebar.grid(row=0, column=0, sticky="nsew")
 
         # Inner container for vertical centering
@@ -54,7 +70,7 @@ class LoginWindow(ctk.CTk):
             content_frame,
             text="University Attendance\nManagement",
             font=ctk.CTkFont(family="Inter", size=24, weight="bold"),
-            text_color="#FFFFFF",
+            text_color=theme.c("login_title"),
             justify="center",
         )
         brand_title.pack(pady=(0, 10))
@@ -63,13 +79,15 @@ class LoginWindow(ctk.CTk):
             content_frame,
             text="Secure Portal Access",
             font=ctk.CTkFont(size=13),
-            text_color="#A0A0B8",
+            text_color=theme.c("login_sub"),
         )
         brand_sub.pack()
 
     def _build_form(self):
         """Creates the interactive login form on the right panel."""
-        form_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#14141F")
+        from gui import theme
+
+        form_frame = ctk.CTkFrame(self, corner_radius=0, fg_color=theme.c("login_form"))
         form_frame.grid(row=0, column=1, sticky="nsew")
 
         # Form content wrapper
@@ -81,7 +99,7 @@ class LoginWindow(ctk.CTk):
             container,
             text="Welcome back",
             font=ctk.CTkFont(family="Inter", size=26, weight="bold"),
-            text_color="#FFFFFF",
+            text_color=theme.c("login_title"),
         )
         header.pack(anchor="w", pady=(0, 4))
 
@@ -89,7 +107,7 @@ class LoginWindow(ctk.CTk):
             container,
             text="Please enter your details to sign in",
             font=ctk.CTkFont(size=13),
-            text_color="#8E8EA8",
+            text_color=theme.c("login_sub"),
         )
         sub_header.pack(anchor="w", pady=(0, 30))
 
@@ -98,7 +116,7 @@ class LoginWindow(ctk.CTk):
             container,
             text="Username",
             font=ctk.CTkFont(size=12, weight="bold"),
-            text_color="#D1D1E0",
+            text_color=theme.c("login_label"),
         )
         username_label.pack(anchor="w", pady=(0, 5))
 
@@ -109,10 +127,10 @@ class LoginWindow(ctk.CTk):
             height=42,
             border_width=1,
             corner_radius=8,
-            fg_color="#1E1E2E",
-            border_color="#2A2A3C",
-            text_color="#FFFFFF",
-            placeholder_text_color="#6C6C8A",
+            fg_color=theme.c("field_bg"),
+            border_color=theme.c("login_border"),
+            text_color=theme.c("login_label"),
+            placeholder_text_color=theme.c("placeholder"),
         )
         self.username_entry.pack(pady=(0, 18))
 
@@ -121,7 +139,7 @@ class LoginWindow(ctk.CTk):
             container,
             text="Password",
             font=ctk.CTkFont(size=12, weight="bold"),
-            text_color="#D1D1E0",
+            text_color=theme.c("login_label"),
         )
         password_label.pack(anchor="w", pady=(0, 5))
 
@@ -133,10 +151,10 @@ class LoginWindow(ctk.CTk):
             show="*",
             border_width=1,
             corner_radius=8,
-            fg_color="#1E1E2E",
-            border_color="#2A2A3C",
-            text_color="#FFFFFF",
-            placeholder_text_color="#6C6C8A",
+            fg_color=theme.c("field_bg"),
+            border_color=theme.c("login_border"),
+            text_color=theme.c("login_label"),
+            placeholder_text_color=theme.c("placeholder"),
         )
         self.password_entry.pack(pady=(0, 6))
 
@@ -148,10 +166,10 @@ class LoginWindow(ctk.CTk):
             variable=self.show_password_var,
             command=self._toggle_password_visibility,
             font=ctk.CTkFont(size=12),
-            text_color="#8E8EA8",
-            fg_color="#3B82F6",
-            border_color="#2A2A3C",
-            hover_color="#2563EB",
+            text_color=theme.c("login_sub"),
+            fg_color=theme.c("login_blue"),
+            border_color=theme.c("login_border"),
+            hover_color=theme.c("login_blue_hover"),
             checkbox_width=18,
             checkbox_height=18,
         )
@@ -161,7 +179,7 @@ class LoginWindow(ctk.CTk):
         self.error_label = ctk.CTkLabel(
             container,
             text="",
-            text_color="#FF5555",
+            text_color=theme.c("login_error"),
             font=ctk.CTkFont(size=12),
             height=20,
         )
@@ -175,8 +193,8 @@ class LoginWindow(ctk.CTk):
             height=44,
             corner_radius=8,
             font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color="#3B82F6",
-            hover_color="#2563EB",
+            fg_color=theme.c("login_blue"),
+            hover_color=theme.c("login_blue_hover"),
             command=self.login,
         )
         self.login_btn.pack()
@@ -186,7 +204,7 @@ class LoginWindow(ctk.CTk):
             container,
             text="Forgot password?",
             font=ctk.CTkFont(size=12, underline=True),
-            text_color="#6C6C8A",
+            text_color=theme.c("placeholder"),
             cursor="hand2",
         )
         self.forgot_link.pack(pady=(8, 0))

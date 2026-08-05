@@ -1,4 +1,5 @@
 import customtkinter as ctk
+from gui import theme
 from tkinter import messagebox, filedialog, ttk
 from PIL import Image
 import os
@@ -7,28 +8,14 @@ import pandas as pd
 
 class StudentManagementView(ctk.CTkFrame):
     def __init__(self, db, parent):
-        super().__init__(parent, fg_color="#0F172A")  # Slate 900 background
+        super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
         self.photo_path = None
         self.selected_student_id = None
         self.pack(fill="both", expand=True)
 
         # Color Palette Definition
-        self.colors = {
-            "bg_dark": "#0F172A",
-            "card_bg": "#1E293B",
-            "card_border": "#334155",
-            "primary": "#0EA5E9",
-            "primary_hover": "#0284C7",
-            "success": "#10B981",
-            "success_hover": "#059669",
-            "danger": "#EF4444",
-            "danger_hover": "#DC2626",
-            "neutral_btn": "#334155",
-            "neutral_hover": "#475569",
-            "text_main": "#F8FAFC",
-            "text_muted": "#94A3B8"
-        }
+        self.colors = theme.colors
 
         self.build_ui()
         self.after(50, self.load_students)
@@ -72,7 +59,7 @@ class StudentManagementView(ctk.CTkFrame):
             form_card,
             height=230,
             fg_color="transparent",
-            segmented_button_fg_color="#0F172A",
+            segmented_button_fg_color=theme.c("bg_dark"),
             segmented_button_selected_color=self.colors["primary"],
             segmented_button_selected_hover_color=self.colors["primary_hover"]
         )
@@ -159,29 +146,29 @@ class StudentManagementView(ctk.CTkFrame):
 
         style.configure(
             "Student.Treeview",
-            background="#1E293B",
-            foreground="#F8FAFC",
-            fieldbackground="#1E293B",
+            background=theme.c("table_bg"),
+            foreground=theme.c("table_fg"),
+            fieldbackground=theme.c("table_bg"),
             rowheight=36,
             font=("Segoe UI", 10),
             borderwidth=0
         )
         style.configure(
             "Student.Treeview.Heading",
-            background="#0F172A",
-            foreground="#94A3B8",
+            background=theme.c("table_head_bg"),
+            foreground=theme.c("table_head_fg"),
             font=("Segoe UI", 10, "bold"),
             relief="flat",
             padding=6
         )
         style.map(
             "Student.Treeview",
-            background=[("selected", "#334155")],
-            foreground=[("selected", "#FFFFFF")]
+            background=[("selected", theme.c("table_selected"))],
+            foreground=[("selected", theme.c("table_selected_fg"))]
         )
         style.map(
             "Student.Treeview.Heading",
-            background=[("active", "#1E293B")]
+            background=[("active", theme.c("table_head_active"))]
         )
 
         columns = ("id", "name", "gender", "department", "class", "phone", "email")

@@ -1,8 +1,9 @@
 import customtkinter as ctk
+from gui import theme
 
 class StudentSubjectsView(ctk.CTkFrame):
     def __init__(self, db, parent, user):
-        super().__init__(parent)
+        super().__init__(parent, fg_color=theme.c("bg_dark"))
         self.db = db
         self.user = user
         self.pack(fill="both", expand=True)
@@ -33,8 +34,8 @@ class StudentSubjectsView(ctk.CTkFrame):
         scroll.pack(fill="both", expand=True, padx=40, pady=10)
 
         for c in courses:
-            card = ctk.CTkFrame(scroll, fg_color="#1E1E2E", corner_radius=8,
-                                border_width=1, border_color="#2A2A3C")
+            card = ctk.CTkFrame(scroll, fg_color=theme.c("card_alt"), corner_radius=8,
+                                border_width=1, border_color=theme.c("border_alt"))
             card.pack(fill="x", pady=5)
 
             info = f"{c['course_code']} - {c['course_name']}"
