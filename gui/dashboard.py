@@ -1,0 +1,229 @@
+import customtkinter as ctk
+from tkinter import messagebox
+from database.db_manager import DatabaseManager
+from datetime import date
+from gui.sidebar import Sidebar
+
+class DashboardWindow(ctk.CTkToplevel):
+    def __init__(self, parent, user):
+        super().__init__(parent)
+        self.parent = parent
+        self.user = user
+        self.db = DatabaseManager()
+        self.title("UAMS - Dashboard")
+        self.attributes("-zoomed", True)
+
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        self.sidebar = Sidebar(
+            self,
+            user=self.user,
+            on_navigate=self.show_frame,
+            on_change_password=self.change_password,
+            on_logout=self.logout,
+        )
+
+        self.content_frame = ctk.CTkFrame(self, corner_radius=0)
+        self.content_frame.pack(side="right", fill="both", expand=True)
+
+        self.frames = {}
+        self.show_frame("dashboard")
+
+    def show_frame(self, name):
+        self.sidebar.set_active(name)
+
+        for widget in self.content_frame.winfo_children():
+            widget.destroy()
+
+        from gui.dashboard_view import DashboardView
+        from gui.student_management import StudentManagementView
+        from gui.teacher_management import TeacherManagementView
+        from gui.department_management import DepartmentManagementView
+        from gui.course_management import CourseManagementView
+        from gui.class_management import ClassManagementView
+        from gui.attendance_view import AttendanceView, AttendanceTakeView
+        from gui.reports import ReportsView
+        from gui.settings_view import SettingsView
+        from gui.user_management import UserManagementView
+        from gui.academic_year_view import AcademicYearView
+        from gui.teacher_profile_view import TeacherProfileView
+        from gui.teacher_classes_view import TeacherClassesView
+        from gui.student_subjects_view import StudentSubjectsView
+        from gui.student_report_view import StudentReportView
+
+        views = {
+            "dashboard": (DashboardView, [self.user, self.db, self.content_frame]),
+            "users": (UserManagementView, [self.db, self.content_frame]),
+            "students": (StudentManagementView, [self.db, self.content_frame]),
+            "teachers": (TeacherManagementView, [self.db, self.content_frame]),
+            "departments": (DepartmentManagementView, [self.db, self.content_frame]),
+            "courses": (CourseManagementView, [self.db, self.content_frame]),
+            "classes": (ClassManagementView, [self.db, self.content_frame]),
+            "attendance": (AttendanceTakeView, [self.user, self.db, self.content_frame]),
+            "reports": (ReportsView, [self.db, self.content_frame]),
+            "academic_year": (AcademicYearView, [self.db, self.content_frame]),
+            "settings": (SettingsView, [self.db, self.content_frame]),
+            "take_attendance": (AttendanceTakeView, [self.user, self.db, self.content_frame]),
+            "attendance_view": (AttendanceView, [self.db, self.content_frame]),
+            "attendance_report": (StudentReportView, [self.db, self.content_frame, self.user]),
+            "my_attendance": (AttendanceView, [self.db, self.content_frame, self.user]),
+            "my_subjects": (StudentSubjectsView, [self.db, self.content_frame, self.user]),
+            "my_classes": (TeacherClassesView, [self.db, self.content_frame, self.user]),
+            "teacher_profile": (TeacherProfileView, [self.db, self.content_frame, self.user]),
+            "student_profile": (StudentProfileView, [self.db, self.content_frame, self.user]),
+            "my_courses": (MyCoursesView, [self.db, self.content_frame, self.user]),
+        }
+
+        if name in views:
+            cls, args = views[name]
+            frame = cls(*args)
+            if hasattr(frame, 'pack'):
+                frame.pack(fill="both", expand=True)
+            self.frames[name] = frame
+
+    def change_password(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Change Password")
+        dialog.geometry("350x250")
+
+        ctk.CTkLabel(dialog, text="Change Password", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
+
+        ctk.CTkLabel(dialog, text="Current Password:").pack()
+        old_e = ctk.CTkEntry(dialog, width=250, show="*")
+        old_e.pack(pady=5)
+
+        ctk.CTkLabel(dialog, text="New Password:").pack()
+        new_e = ctk.CTkEntry(dialog, width=250, show="*")
+        new_e.pack(pady=5)
+
+        ctk.CTkLabel(dialog, text="Confirm New Password:").pack()
+        confirm_e = ctk.CTkEntry(dialog, width=250, show="*")
+        confirm_e.pack(pady=5)
+
+        def save():
+            old = old_e.get()
+            new = new_e.get()
+            confirm = confirm_e.get()
+            if not old or not new:
+                messagebox.showerror("Error", "Fill all fields")
+                return
+            if new != confirm:
+                messagebox.showerror("Error", "New passwords do not match")
+                return
+            if len(new) < 4:
+                messagebox.showerror("Error", "Password must be at least 4 characters")
+                return
+            if self.db.change_password(self.user["id"], old, new):
+                messagebox.showinfo("Success", "Password changed successfully")
+                dialog.destroy()
+            else:
+                messagebox.showerror("Error", "Current password is incorrect")
+
+        ctk.CTkButton(dialog, text="Save", command=save).pack(pady=10)
+
+    def logout(self):
+        self.destroy()
+        self.parent.deiconify()
+
+    def on_close(self):
+        self.destroy()
+        self.parent.deiconify()
+
+
+class StudentProfileView(ctk.CTkFrame):
+    def __init__(self, db, parent, user):
+        super().__init__(parent)
+        self.db = db
+        self.user = user
+        self.pack(fill="both", expand=True)
+
+        ctk.CTkLabel(self, text="My Profile", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
+
+        conn = db.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""SELECT s.*, d.name as department_name FROM students s
+            LEFT JOIN departments d ON s.department_id = d.id
+            WHERE s.user_id=?""", (user["id"],))
+        student = cursor.fetchone()
+
+        if not student:
+            cursor.execute("""SELECT s.*, d.name as department_name FROM students s
+                LEFT JOIN departments d ON s.department_id = d.id
+                WHERE s.email=? OR s.student_id=?""",
+                (user.get("email", ""), user["username"]))
+            student = cursor.fetchone()
+        conn.close()
+
+        if student:
+            info_frame = ctk.CTkFrame(self)
+            info_frame.pack(pady=20, padx=40, fill="both", expand=True)
+
+            fields = [
+                ("Student ID", student["student_id"]),
+                ("Full Name", student["full_name"]),
+                ("Gender", student["gender"]),
+                ("Date of Birth", student["dob"]),
+                ("Phone", student["phone"]),
+                ("Email", student["email"]),
+                ("Address", student["address"]),
+                ("Department", student["department_name"]),
+                ("Year", str(student["year"])),
+                ("Class", student["class_name"]),
+            ]
+            for i, (label, value) in enumerate(fields):
+                f = ctk.CTkFrame(info_frame)
+                f.grid(row=i, column=0, sticky="ew", pady=2, padx=20)
+                ctk.CTkLabel(f, text=label + ":", font=ctk.CTkFont(size=14, weight="bold"),
+                             width=150, anchor="w").pack(side="left")
+                ctk.CTkLabel(f, text=value or "N/A", font=ctk.CTkFont(size=14)).pack(side="left", padx=10)
+
+            summary = db.get_attendance_summary(student_id=student["id"])
+            ctk.CTkLabel(info_frame, text=f"Overall Attendance: {summary.get('percentage', 0)}%",
+                         font=ctk.CTkFont(size=16, weight="bold"),
+                         text_color="#10B981" if summary.get('percentage', 0) >= 75 else "#F59E0B"
+                         ).grid(row=len(fields), column=0, pady=10)
+        else:
+            ctk.CTkLabel(self, text="Student profile not found. Contact admin to link your account.",
+                         font=ctk.CTkFont(size=16)).pack(pady=50)
+
+
+class MyCoursesView(ctk.CTkFrame):
+    def __init__(self, db, parent, user):
+        super().__init__(parent)
+        self.db = db
+        self.user = user
+        self.pack(fill="both", expand=True)
+
+        ctk.CTkLabel(self, text="My Courses",
+                     font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
+
+        conn = db.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""SELECT t.id FROM teachers t WHERE t.user_id=?""", (user["id"],))
+        teacher = cursor.fetchone()
+        conn.close()
+
+        if not teacher:
+            ctk.CTkLabel(self, text="Teacher profile not linked to this account.",
+                         font=ctk.CTkFont(size=16)).pack(pady=50)
+            return
+
+        courses = db.get_courses(teacher_id=teacher["id"])
+        if not courses:
+            ctk.CTkLabel(self, text="No courses assigned to you.",
+                         font=ctk.CTkFont(size=16)).pack(pady=50)
+            return
+
+        for c in courses:
+            card = ctk.CTkFrame(self, fg_color="#1E1E2E", corner_radius=8,
+                                border_width=1, border_color="#2A2A3C")
+            card.pack(fill="x", padx=40, pady=5)
+
+            info = f"{c['course_code']} - {c['course_name']}"
+            if c.get("semester"):
+                info += f" | Semester: {c['semester']}"
+            if c.get("credit"):
+                info += f" | Credit: {c['credit']}"
+
+            ctk.CTkLabel(card, text=info, font=ctk.CTkFont(size=14),
+                         anchor="w").pack(side="left", padx=15, pady=10)
