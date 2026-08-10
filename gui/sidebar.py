@@ -156,6 +156,8 @@ class Sidebar(ctk.CTkFrame):
                 (None, "---"),
                 ("academic_year",  "  Academic Year / Semester"),
                 ("settings",       "  Settings"),
+                (None, "---"),
+                ("admin_profile",  "  My Profile"),
             ]
         elif role == "teacher":
             items = [

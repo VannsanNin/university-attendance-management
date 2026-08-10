@@ -75,8 +75,14 @@ python main.py
 ```
 
 Default login credentials:
-- **Username:** `admin`
-- **Password:** `admin123`
+
+| Role    | Username | Password       |
+|---------|----------|----------------|
+| Admin   | `admin`  | `admin123`     |
+| Teacher | `T001`   | `T001`         |
+| Student | `S001`   | `S001`         |
+
+Teacher accounts default to the teacher ID as password; student accounts default to the student's date of birth, or the student ID when no DOB is set.
 
 ## Database
 

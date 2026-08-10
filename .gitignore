@@ -21,6 +21,7 @@ ENV/
 *.sqlite3
 backup/
 *.bak
+session.json
 
 # Face / user photos
 photos/*

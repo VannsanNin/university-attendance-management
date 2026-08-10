@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from database.db_manager import DatabaseManager
+from utils.session import save_session, load_session, clear_session
 
 
 class LoginWindow(ctk.CTk):
@@ -29,6 +30,21 @@ class LoginWindow(ctk.CTk):
         self._build_form()
 
         self.dashboard = None
+
+        self._try_auto_login()
+
+    def _try_auto_login(self):
+        session = load_session()
+        if not session:
+            return
+        user = self.db.authenticate(session["username"], session["password"])
+        if user:
+            self.withdraw()
+            from gui.dashboard import DashboardWindow
+
+            self.dashboard = DashboardWindow(self, user)
+        else:
+            clear_session()
 
     def apply_theme(self):
         """Rebuilds the window UI after the theme mode changes (e.g. on logout)."""
@@ -261,6 +277,7 @@ class LoginWindow(ctk.CTk):
 
         user = self.db.authenticate(username, password)
         if user:
+            save_session(username, password)
             self.withdraw()
             from gui.dashboard import DashboardWindow
 

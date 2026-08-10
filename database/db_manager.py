@@ -2,7 +2,7 @@ import sqlite3
 import os
 import pickle
 import bcrypt
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from threading import Timer
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uams.db")
@@ -837,6 +837,291 @@ class DatabaseManager:
         stats = dict(cursor.fetchone())
         conn.close()
         return {k: (v or 0) for k, v in stats.items()}
+
+    # ---- Dashboard queries ----
+    def get_student_by_user_id(self, user_id):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""SELECT s.*, d.name as department_name FROM students s
+            LEFT JOIN departments d ON s.department_id = d.id WHERE s.user_id=?""", (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    def get_teacher_by_user_id(self, user_id):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""SELECT t.*, d.name as department_name FROM teachers t
+            LEFT JOIN departments d ON t.department_id = d.id WHERE t.user_id=?""", (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    def get_attendance_trend(self, days=7, end_date=None):
+        """Daily attendance totals + rate for the last `days` days (inclusive)."""
+        conn = self.get_conn()
+        try:
+            end = date.fromisoformat(end_date) if end_date else date.today()
+        except ValueError:
+            end = date.today()
+        start = end - timedelta(days=days - 1)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT attendance_date, COUNT(*) as total,
+                   SUM(CASE WHEN status IN ('Present','Late','Permission','Excused') THEN 1 ELSE 0 END) as attended
+            FROM attendance
+            WHERE attendance_date BETWEEN ? AND ?
+            GROUP BY attendance_date
+        """, (start.isoformat(), end.isoformat()))
+        rows = {r["attendance_date"]: dict(r) for r in cursor.fetchall()}
+        conn.close()
+        trend = []
+        d = start
+        while d <= end:
+            key = d.isoformat()
+            row = rows.get(key, {})
+            total = row.get("total") or 0
+            attended = row.get("attended") or 0
+            trend.append({
+                "date": key,
+                "label": d.strftime("%a %d"),
+                "total": total,
+                "attended": attended,
+                "rate": round(attended * 100 / total, 1) if total else 0.0,
+            })
+            d += timedelta(days=1)
+        return trend
+
+    def get_attendance_by_class(self, start_date=None, end_date=None):
+        """Per-class roster size and attendance rate (optionally date-filtered)."""
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        params = []
+        date_filter = ""
+        if start_date:
+            date_filter += " AND a.attendance_date>=?"
+            params.append(start_date)
+        if end_date:
+            date_filter += " AND a.attendance_date<=?"
+            params.append(end_date)
+        cursor.execute(f"""
+            SELECT cl.id, cl.class_name, d.name as department_name, t.full_name as teacher_name,
+                   COUNT(DISTINCT cs.student_id) as student_count,
+                   COUNT(a.id) as att_total,
+                   SUM(CASE WHEN a.status IN ('Present','Late','Permission','Excused') THEN 1 ELSE 0 END) as attended
+            FROM classes cl
+            LEFT JOIN departments d ON cl.department_id = d.id
+            LEFT JOIN teachers t ON cl.teacher_id = t.id
+            LEFT JOIN class_students cs ON cs.class_id = cl.id
+            LEFT JOIN attendance a ON a.class_id = cl.id {date_filter}
+            GROUP BY cl.id
+            ORDER BY cl.class_name
+        """, params)
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        for r in rows:
+            r["student_count"] = r["student_count"] or 0
+            r["att_total"] = r["att_total"] or 0
+            r["attended"] = r["attended"] or 0
+            r["att_rate"] = round(r["attended"] * 100 / r["att_total"], 1) if r["att_total"] else 0.0
+            r["absent"] = r["att_total"] - r["attended"]
+        return rows
+
+    def get_low_attendance_students(self, threshold=75, limit=10, teacher_id=None):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        query = """
+            SELECT s.id, s.student_id, s.full_name, s.class_name, d.name as department_name,
+                   COUNT(a.id) as total,
+                   SUM(CASE WHEN a.status IN ('Present','Late','Permission','Excused') THEN 1 ELSE 0 END) as attended
+            FROM attendance a
+            JOIN students s ON a.student_id = s.id
+            LEFT JOIN departments d ON s.department_id = d.id
+        """
+        params = []
+        if teacher_id:
+            query += " JOIN courses c ON a.course_id = c.id WHERE c.teacher_id=?"
+            params.append(teacher_id)
+        query += """
+            GROUP BY s.id
+            HAVING attended * 100.0 / total < ?
+            ORDER BY attended * 100.0 / total ASC
+        """
+        params.append(threshold)
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+        cursor.execute(query, params)
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        for r in rows:
+            r["total"] = r["total"] or 0
+            r["attended"] = r["attended"] or 0
+            r["rate"] = round(r["attended"] * 100 / r["total"], 1) if r["total"] else 0.0
+        return rows
+
+    def get_department_stats(self):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT d.id, d.name, d.code,
+                   COUNT(DISTINCT s.id) as students,
+                   COUNT(a.id) as att_total,
+                   SUM(CASE WHEN a.status IN ('Present','Late','Permission','Excused') THEN 1 ELSE 0 END) as attended
+            FROM departments d
+            LEFT JOIN students s ON s.department_id = d.id
+            LEFT JOIN attendance a ON a.student_id = s.id
+            GROUP BY d.id
+            ORDER BY d.name
+        """)
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        for r in rows:
+            r["students"] = r["students"] or 0
+            r["att_total"] = r["att_total"] or 0
+            r["attended"] = r["attended"] or 0
+            r["att_rate"] = round(r["attended"] * 100 / r["att_total"], 1) if r["att_total"] else 0.0
+        return rows
+
+    def get_attendance_calendar(self, year=None, month=None):
+        """Daily attendance rate for every day of a month (None = no records)."""
+        today = date.today()
+        year = year or today.year
+        month = month or today.month
+        first = date(year, month, 1)
+        nxt = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT attendance_date, COUNT(*) as total,
+                   SUM(CASE WHEN status IN ('Present','Late','Permission','Excused') THEN 1 ELSE 0 END) as attended
+            FROM attendance
+            WHERE attendance_date>=? AND attendance_date<?
+            GROUP BY attendance_date
+        """, (first.isoformat(), nxt.isoformat()))
+        rows = {r["attendance_date"]: dict(r) for r in cursor.fetchall()}
+        conn.close()
+        days = []
+        d = first
+        while d < nxt:
+            key = d.isoformat()
+            row = rows.get(key, {})
+            total = row.get("total") or 0
+            attended = row.get("attended") or 0
+            days.append({
+                "date": key,
+                "day": d.day,
+                "weekday": d.weekday(),
+                "total": total,
+                "attended": attended,
+                "rate": round(attended * 100 / total, 1) if total else None,
+            })
+            d += timedelta(days=1)
+        return days
+
+    def get_student_attendance_by_course(self, student_id):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT c.id, c.course_code, c.course_name, t.full_name as teacher_name,
+                   COUNT(a.id) as total,
+                   SUM(CASE WHEN a.status='Present' THEN 1 ELSE 0 END) as present,
+                   SUM(CASE WHEN a.status='Absent' THEN 1 ELSE 0 END) as absent,
+                   SUM(CASE WHEN a.status='Late' THEN 1 ELSE 0 END) as late,
+                   SUM(CASE WHEN a.status IN ('Present','Late','Permission','Excused') THEN 1 ELSE 0 END) as attended
+            FROM attendance a
+            JOIN courses c ON a.course_id = c.id
+            LEFT JOIN teachers t ON c.teacher_id = t.id
+            WHERE a.student_id=?
+            GROUP BY c.id
+            ORDER BY c.course_code
+        """, (student_id,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        for r in rows:
+            r["total"] = r["total"] or 0
+            r["rate"] = round(r["attended"] * 100 / r["total"], 1) if r["total"] else 0.0
+        return rows
+
+    def get_teacher_course_stats(self, teacher_id):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT c.id, c.course_code, c.course_name, cl.class_name,
+                   COUNT(DISTINCT a.student_id) as students_tracked,
+                   COUNT(a.id) as total,
+                   SUM(CASE WHEN a.status IN ('Present','Late','Permission','Excused') THEN 1 ELSE 0 END) as attended
+            FROM courses c
+            LEFT JOIN attendance a ON a.course_id = c.id
+            LEFT JOIN classes cl ON cl.department_id = c.department_id AND cl.teacher_id = c.teacher_id
+            WHERE c.teacher_id=?
+            GROUP BY c.id
+            ORDER BY c.course_code
+        """, (teacher_id,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        for r in rows:
+            r["total"] = r["total"] or 0
+            r["attended"] = r["attended"] or 0
+            r["students_tracked"] = r["students_tracked"] or 0
+            r["rate"] = round(r["attended"] * 100 / r["total"], 1) if r["total"] else 0.0
+        return rows
+
+    def get_teacher_attendance_stats(self, teacher_id, attendance_date=None):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        date_str = attendance_date or date.today().isoformat()
+        cursor.execute("""
+            SELECT COUNT(*) as total,
+                   SUM(CASE WHEN a.status='Present' THEN 1 ELSE 0 END) as present,
+                   SUM(CASE WHEN a.status='Absent' THEN 1 ELSE 0 END) as absent,
+                   SUM(CASE WHEN a.status='Late' THEN 1 ELSE 0 END) as late,
+                   SUM(CASE WHEN a.status='Permission' THEN 1 ELSE 0 END) as permission,
+                   SUM(CASE WHEN a.status IN ('Present','Late','Permission','Excused') THEN 1 ELSE 0 END) as attended
+            FROM attendance a
+            JOIN courses c ON a.course_id = c.id
+            WHERE c.teacher_id=? AND a.attendance_date=?
+        """, (teacher_id, date_str))
+        stats = dict(cursor.fetchone())
+        conn.close()
+        stats = {k: (v or 0) for k, v in stats.items()}
+        stats["rate"] = round(stats["attended"] * 100 / stats["total"], 1) if stats["total"] else 0.0
+        return stats
+
+    def get_teacher_attendance_trend(self, teacher_id, days=7, end_date=None):
+        conn = self.get_conn()
+        try:
+            end = date.fromisoformat(end_date) if end_date else date.today()
+        except ValueError:
+            end = date.today()
+        start = end - timedelta(days=days - 1)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT a.attendance_date, COUNT(*) as total,
+                   SUM(CASE WHEN a.status IN ('Present','Late','Permission','Excused') THEN 1 ELSE 0 END) as attended
+            FROM attendance a
+            JOIN courses c ON a.course_id = c.id
+            WHERE c.teacher_id=? AND a.attendance_date BETWEEN ? AND ?
+            GROUP BY a.attendance_date
+        """, (teacher_id, start.isoformat(), end.isoformat()))
+        rows = {r["attendance_date"]: dict(r) for r in cursor.fetchall()}
+        conn.close()
+        trend = []
+        d = start
+        while d <= end:
+            key = d.isoformat()
+            row = rows.get(key, {})
+            total = row.get("total") or 0
+            attended = row.get("attended") or 0
+            trend.append({
+                "date": key,
+                "label": d.strftime("%a %d"),
+                "total": total,
+                "attended": attended,
+                "rate": round(attended * 100 / total, 1) if total else 0.0,
+            })
+            d += timedelta(days=1)
+        return trend
 
     # ---- Face Recognition ----
     def save_face_encoding(self, student_id, encoding):

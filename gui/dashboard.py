@@ -55,13 +55,13 @@ class DashboardWindow(ctk.CTkToplevel):
         from gui.settings_view import SettingsView
         from gui.user_management import UserManagementView
         from gui.academic_year_view import AcademicYearView
-        from gui.teacher_profile_view import TeacherProfileView
+        from gui.profile import AdminProfileView, TeacherProfileView, StudentProfileView
         from gui.teacher_classes_view import TeacherClassesView
         from gui.student_subjects_view import StudentSubjectsView
         from gui.student_report_view import StudentReportView
 
         views = {
-            "dashboard": (DashboardView, [self.user, self.db, self.content_frame]),
+            "dashboard": (DashboardView, [self.user, self.db, self.content_frame, self.show_frame]),
             "users": (UserManagementView, [self.db, self.content_frame]),
             "students": (StudentManagementView, [self.db, self.content_frame]),
             "teachers": (TeacherManagementView, [self.db, self.content_frame]),
@@ -78,8 +78,9 @@ class DashboardWindow(ctk.CTkToplevel):
             "my_attendance": (AttendanceView, [self.db, self.content_frame, self.user]),
             "my_subjects": (StudentSubjectsView, [self.db, self.content_frame, self.user]),
             "my_classes": (TeacherClassesView, [self.db, self.content_frame, self.user]),
-            "teacher_profile": (TeacherProfileView, [self.db, self.content_frame, self.user]),
-            "student_profile": (StudentProfileView, [self.db, self.content_frame, self.user]),
+            "admin_profile": (AdminProfileView, [self.db, self.content_frame, self.user, self]),
+            "teacher_profile": (TeacherProfileView, [self.db, self.content_frame, self.user, self]),
+            "student_profile": (StudentProfileView, [self.db, self.content_frame, self.user, self]),
             "my_courses": (MyCoursesView, [self.db, self.content_frame, self.user]),
         }
 
@@ -131,6 +132,9 @@ class DashboardWindow(ctk.CTkToplevel):
         ctk.CTkButton(dialog, text="Save", command=save).pack(pady=10)
 
     def logout(self):
+        from utils.session import clear_session
+
+        clear_session()
         self.destroy()
         self.parent.apply_theme()
         self.parent.deiconify()
@@ -139,63 +143,6 @@ class DashboardWindow(ctk.CTkToplevel):
         self.destroy()
         self.parent.apply_theme()
         self.parent.deiconify()
-
-
-class StudentProfileView(ctk.CTkFrame):
-    def __init__(self, db, parent, user):
-        super().__init__(parent, fg_color=theme.c("bg_dark"))
-        self.db = db
-        self.user = user
-        self.pack(fill="both", expand=True)
-
-        ctk.CTkLabel(self, text="My Profile", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
-
-        conn = db.get_conn()
-        cursor = conn.cursor()
-        cursor.execute("""SELECT s.*, d.name as department_name FROM students s
-            LEFT JOIN departments d ON s.department_id = d.id
-            WHERE s.user_id=?""", (user["id"],))
-        student = cursor.fetchone()
-
-        if not student:
-            cursor.execute("""SELECT s.*, d.name as department_name FROM students s
-                LEFT JOIN departments d ON s.department_id = d.id
-                WHERE s.email=? OR s.student_id=?""",
-                (user.get("email", ""), user["username"]))
-            student = cursor.fetchone()
-        conn.close()
-
-        if student:
-            info_frame = ctk.CTkFrame(self)
-            info_frame.pack(pady=20, padx=40, fill="both", expand=True)
-
-            fields = [
-                ("Student ID", student["student_id"]),
-                ("Full Name", student["full_name"]),
-                ("Gender", student["gender"]),
-                ("Date of Birth", student["dob"]),
-                ("Phone", student["phone"]),
-                ("Email", student["email"]),
-                ("Address", student["address"]),
-                ("Department", student["department_name"]),
-                ("Year", str(student["year"])),
-                ("Class", student["class_name"]),
-            ]
-            for i, (label, value) in enumerate(fields):
-                f = ctk.CTkFrame(info_frame)
-                f.grid(row=i, column=0, sticky="ew", pady=2, padx=20)
-                ctk.CTkLabel(f, text=label + ":", font=ctk.CTkFont(size=14, weight="bold"),
-                             width=150, anchor="w").pack(side="left")
-                ctk.CTkLabel(f, text=value or "N/A", font=ctk.CTkFont(size=14)).pack(side="left", padx=10)
-
-            summary = db.get_attendance_summary(student_id=student["id"])
-            ctk.CTkLabel(info_frame, text=f"Overall Attendance: {summary.get('percentage', 0)}%",
-                         font=ctk.CTkFont(size=16, weight="bold"),
-                         text_color=theme.c("success") if summary.get('percentage', 0) >= 75 else theme.c("warning")
-                         ).grid(row=len(fields), column=0, pady=10)
-        else:
-            ctk.CTkLabel(self, text="Student profile not found. Contact admin to link your account.",
-                         font=ctk.CTkFont(size=16)).pack(pady=50)
 
 
 class MyCoursesView(ctk.CTkFrame):
