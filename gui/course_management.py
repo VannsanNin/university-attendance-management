@@ -1,12 +1,15 @@
 import customtkinter as ctk
 from gui import theme
+from gui.skeleton import schedule_table_load
+from gui.activity import log
 from tkinter import messagebox, ttk
 
 
 class CourseManagementView(ctk.CTkFrame):
-    def __init__(self, db, parent):
+    def __init__(self, db, parent, user=None):
         super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
+        self.user = user
         self.selected_course_id = None
         self.pack(fill="both", expand=True)
 
@@ -15,7 +18,7 @@ class CourseManagementView(ctk.CTkFrame):
 
         self.build_ui()
         self.load_combo_data()
-        self.after(50, self.load_courses)
+        schedule_table_load(self, self.table_frame, self.load_courses)
 
     def build_ui(self):
         # -------------------------------------------------------------
@@ -263,6 +266,7 @@ class CourseManagementView(ctk.CTkFrame):
         result = self.db.add_course(code, name, teacher_id, sem, credit, dept_id, acad_year)
         if result:
             messagebox.showinfo("Success", f"Course '{name}' added successfully.")
+            log(self.db, self.user, "CREATE", "Course", f"Added course '{name}' ({code}).")
             self.clear_form()
             self.load_courses()
         else:
@@ -365,6 +369,8 @@ class CourseManagementView(ctk.CTkFrame):
 
             self.db.update_course(self.selected_course_id, **kwargs)
             messagebox.showinfo("Success", "Course updated successfully.")
+            log(self.db, self.user, "UPDATE", "Course",
+                f"Updated course '{course.get('course_name')}' ({course.get('course_code')}).")
             dialog.destroy()
             self.load_courses()
 
@@ -383,6 +389,7 @@ class CourseManagementView(ctk.CTkFrame):
             return
         if messagebox.askyesno("Confirm Deletion", "Are you sure you want to delete this course?"):
             self.db.delete_course(self.selected_course_id)
+            log(self.db, self.user, "DELETE", "Course", f"Deleted course (ID {self.selected_course_id}).")
             self.selected_course_id = None
             self.load_courses()
 
@@ -429,6 +436,8 @@ class CourseManagementView(ctk.CTkFrame):
                         break
             self.db.update_course(self.selected_course_id, teacher_id=teacher_id)
             messagebox.showinfo("Success", "Teacher assigned successfully.")
+            log(self.db, self.user, "UPDATE", "Course",
+                f"Assigned teacher to course (ID {self.selected_course_id}).")
             dialog.destroy()
             self.load_courses()
 

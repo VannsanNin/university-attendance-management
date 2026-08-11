@@ -1,12 +1,15 @@
 import customtkinter as ctk
 from gui import theme
+from gui.skeleton import schedule_table_load
+from gui.activity import log
 from tkinter import messagebox, ttk
 
 
 class TeacherManagementView(ctk.CTkFrame):
-    def __init__(self, db, parent):
+    def __init__(self, db, parent, user=None):
         super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
+        self.user = user
         self.selected_teacher_id = None
         self.pack(fill="both", expand=True)
 
@@ -14,7 +17,7 @@ class TeacherManagementView(ctk.CTkFrame):
         self.colors = theme.colors
 
         self.build_ui()
-        self.after(50, self.load_teachers)
+        schedule_table_load(self, self.table_frame, self.load_teachers)
 
     def build_ui(self):
         # -------------------------------------------------------------
@@ -264,6 +267,7 @@ class TeacherManagementView(ctk.CTkFrame):
             if user_id:
                 self.db.link_teacher_user(result, user_id)
             messagebox.showinfo("Success", f"Teacher profile '{name}' created successfully.")
+            log(self.db, self.user, "CREATE", "Teacher", f"Added teacher {tid} '{name}'.")
             self.clear_form()
             self.load_teachers()
         else:
@@ -333,6 +337,8 @@ class TeacherManagementView(ctk.CTkFrame):
                     kwargs["department_id"] = d["id"]
                     break
             self.db.update_teacher(self.selected_teacher_id, **kwargs)
+            log(self.db, self.user, "UPDATE", "Teacher",
+                f"Updated teacher profile '{t.get('full_name')}'.")
             messagebox.showinfo("Success", "Teacher details updated successfully.")
             dialog.destroy()
             self.load_teachers()
@@ -353,6 +359,8 @@ class TeacherManagementView(ctk.CTkFrame):
         t = self.db.get_teacher(self.selected_teacher_id)
         if t and messagebox.askyesno("Confirm Deletion", f"Permanently delete faculty record for '{t['full_name']}'?"):
             self.db.delete_teacher(self.selected_teacher_id)
+            log(self.db, self.user, "DELETE", "Teacher",
+                f"Deleted teacher '{t['full_name']}' ({t.get('teacher_id')}).")
             self.selected_teacher_id = None
             self.load_teachers()
 

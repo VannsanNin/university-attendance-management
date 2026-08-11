@@ -15,7 +15,6 @@ A desktop application for managing university attendance built with Python, Cust
 - Manage Users, Students, Teachers, Departments, Courses, Classes
 - Take and view attendance
 - Generate reports with export (Excel, CSV, PDF)
-- Face recognition attendance
 - Database backup & restore
 - System settings
 
@@ -37,7 +36,6 @@ A desktop application for managing university attendance built with Python, Cust
 - **Attendance Management** - Take attendance with Present/Absent/Late/Permission status
 - **Attendance Dashboard** - Real-time stats with progress bar
 - **Reports** - Daily, monthly, student, teacher reports with PDF/Excel/CSV export
-- **Face Recognition** - Register faces, auto-mark attendance via camera (optional)
 - **Database Backup & Restore** - Manual and scheduled backups
 - **System Settings** - University info, theme toggle, email SMTP config
 
@@ -61,11 +59,6 @@ source .venv/bin/activate   # Linux/Mac
 
 # Install dependencies
 pip install -r requirements.txt
-```
-
-For face recognition (optional):
-```bash
-pip install opencv-python face-recognition
 ```
 
 ## Usage
@@ -106,7 +99,6 @@ The application uses SQLite (`uams.db`). The database is created automatically o
 │   ├── class_management.py
 │   ├── attendance_view.py   # Take and view attendance
 │   ├── reports.py           # Report generation and export
-│   ├── face_recognition_view.py
 │   ├── backup_restore.py
 │   └── settings_view.py
 ├── photos/                  # Student photos
@@ -119,10 +111,3 @@ Reports can be exported to:
 - **Excel** (.xlsx) via openpyxl
 - **CSV** via pandas
 - **PDF** via reportlab
-
-## Face Recognition
-
-The face recognition module requires OpenCV and face_recognition libraries. When enabled:
-1. Register a student's face via camera
-2. Start face recognition attendance
-3. The system automatically detects and marks recognized students as Present

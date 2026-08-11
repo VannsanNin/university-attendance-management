@@ -2,6 +2,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 from database.db_manager import DatabaseManager
 from utils.session import save_session, load_session, clear_session
+from gui.activity import log
 
 
 class LoginWindow(ctk.CTk):
@@ -39,6 +40,7 @@ class LoginWindow(ctk.CTk):
             return
         user = self.db.authenticate(session["username"], session["password"])
         if user:
+            log(self.db, user, "LOGIN", "Auth", f"User '{user['username']}' logged in (auto-session).")
             self.withdraw()
             from gui.dashboard import DashboardWindow
 
@@ -262,6 +264,7 @@ class LoginWindow(ctk.CTk):
                 messagebox.showerror("Error", "Username not found")
                 return
             self.db.update_user_password(user["id"], new_pw)
+            log(self.db, None, "PASSWORD_RESET", "Auth", f"Password reset for user '{uname}'.")
             messagebox.showinfo("Success", f"Password reset for '{uname}'. You can now log in.")
             dialog.destroy()
 
@@ -277,10 +280,12 @@ class LoginWindow(ctk.CTk):
 
         user = self.db.authenticate(username, password)
         if user:
+            log(self.db, user, "LOGIN", "Auth", f"User '{username}' logged in.")
             save_session(username, password)
             self.withdraw()
             from gui.dashboard import DashboardWindow
 
             self.dashboard = DashboardWindow(self, user)
         else:
+            log(self.db, None, "LOGIN_FAILED", "Auth", f"Failed login attempt for username '{username}'.")
             self.error_label.configure(text="❌  Invalid username or password")

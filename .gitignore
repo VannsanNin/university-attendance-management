@@ -23,7 +23,7 @@ backup/
 *.bak
 session.json
 
-# Face / user photos
+# User photos
 photos/*
 
 # OS

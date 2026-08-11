@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from gui import theme
+from gui.activity import log
 from tkinter import messagebox, filedialog, ttk
 from datetime import date, datetime
 import pandas as pd
@@ -320,6 +321,8 @@ class AttendanceTakeView(ctk.CTkFrame):
                 count += 1
 
         messagebox.showinfo("Success", f"Attendance successfully saved for {count} students.")
+        log(self.db, self.user, "CREATE", "Attendance",
+            f"Saved attendance for {count} students ({course_code}, {attendance_date}).")
         self.load_students()
 
     def export_csv(self):

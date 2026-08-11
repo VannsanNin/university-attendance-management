@@ -1,12 +1,15 @@
 import customtkinter as ctk
 from gui import theme
+from gui.skeleton import schedule_table_load
+from gui.activity import log
 from tkinter import messagebox, ttk
 
 
 class DepartmentManagementView(ctk.CTkFrame):
-    def __init__(self, db, parent):
+    def __init__(self, db, parent, user=None):
         super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
+        self.user = user
         self.selected_dept_id = None
         self.pack(fill="both", expand=True)
 
@@ -14,7 +17,7 @@ class DepartmentManagementView(ctk.CTkFrame):
         self.colors = theme.colors
 
         self.build_ui()
-        self.after(50, self.load_departments)
+        schedule_table_load(self, self.table_frame, self.load_departments)
 
     def build_ui(self):
         # -------------------------------------------------------------
@@ -305,6 +308,7 @@ class DepartmentManagementView(ctk.CTkFrame):
         result = self.db.add_department(name, code, faculty, hod, desc)
         if result:
             messagebox.showinfo("Success", f"Department '{name}' added successfully.")
+            log(self.db, self.user, "CREATE", "Department", f"Added department '{name}'.")
             self.clear_form()
             self.load_departments()
         else:
@@ -325,6 +329,7 @@ class DepartmentManagementView(ctk.CTkFrame):
 
         self.db.update_department(self.selected_dept_id, name, code, faculty, hod, desc)
         messagebox.showinfo("Success", "Department updated successfully.")
+        log(self.db, self.user, "UPDATE", "Department", f"Updated department '{name}'.")
         self.clear_form()
         self.load_departments()
 
@@ -336,6 +341,7 @@ class DepartmentManagementView(ctk.CTkFrame):
         if dept and messagebox.askyesno("Confirm Action",
                                         f"Are you sure you want to delete department '{dept['name']}'?"):
             self.db.delete_department(self.selected_dept_id)
+            log(self.db, self.user, "DELETE", "Department", f"Deleted department '{dept['name']}'.")
             self.selected_dept_id = None
             self.clear_form()
             self.load_departments()

@@ -1,6 +1,5 @@
 import sqlite3
 import os
-import pickle
 import bcrypt
 from datetime import datetime, date, timedelta
 from threading import Timer
@@ -110,6 +109,7 @@ class DatabaseManager:
                 teacher_id INTEGER,
                 academic_year TEXT,
                 semester INTEGER,
+                year INTEGER,
                 advisor TEXT,
                 room TEXT,
                 schedule TEXT,
@@ -144,12 +144,22 @@ class DatabaseManager:
                 UNIQUE(student_id, course_id, attendance_date)
             );
 
-            CREATE TABLE IF NOT EXISTS face_encodings (
+            CREATE TABLE IF NOT EXISTS attendance_requests (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                student_id INTEGER NOT NULL UNIQUE,
-                encoding BLOB,
-                registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+                student_id INTEGER NOT NULL,
+                course_id INTEGER,
+                class_id INTEGER,
+                request_date DATE NOT NULL,
+                request_type TEXT NOT NULL DEFAULT 'Correction',
+                reason TEXT,
+                status TEXT NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending','Approved','Rejected')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                reviewed_by INTEGER,
+                reviewed_at TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+                FOREIGN KEY (course_id) REFERENCES courses(id),
+                FOREIGN KEY (class_id) REFERENCES classes(id),
+                FOREIGN KEY (reviewed_by) REFERENCES users(id)
             );
 
             CREATE TABLE IF NOT EXISTS notifications (
@@ -181,7 +191,18 @@ class DatabaseManager:
 
             CREATE TABLE IF NOT EXISTS backup_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                file_path TEXT,
+                filename TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS activity_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                username TEXT,
+                role TEXT,
+                action TEXT NOT NULL,
+                module TEXT,
+                description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         ''')
@@ -210,6 +231,7 @@ class DatabaseManager:
             "ALTER TABLE classes ADD COLUMN advisor TEXT",
             "ALTER TABLE classes ADD COLUMN room TEXT",
             "ALTER TABLE classes ADD COLUMN schedule TEXT",
+            "ALTER TABLE classes ADD COLUMN year INTEGER",
             "ALTER TABLE attendance ADD COLUMN attendance_time TIME",
         ]:
             try:
@@ -341,7 +363,7 @@ class DatabaseManager:
     def update_user(self, user_id, **kwargs):
         conn = self.get_conn()
         cursor = conn.cursor()
-        allowed = {"username", "email", "is_active", "role"}
+        allowed = {"username", "email", "phone", "is_active", "role"}
         for key, value in kwargs.items():
             if key in allowed:
                 cursor.execute(f"UPDATE users SET {key}=? WHERE id=?", (value, user_id))
@@ -465,7 +487,7 @@ class DatabaseManager:
         allowed = {"student_id","full_name","first_name","last_name","gender","dob","nationality","phone","email","address","department_id","program","year","semester","class_name","photo_path","guardian_name","guardian_phone","emergency_contact"}
         for key, value in kwargs.items():
             if key in allowed and value is not None:
-                cursor.execute(f"UPDATE students SET {key}=? WHERE id=?", (value, sid))
+                cursor.execute(f"UPDATE students SET {key}=? WHERE id=? OR student_id=?", (value, sid, sid))
         conn.commit()
         conn.close()
 
@@ -535,7 +557,7 @@ class DatabaseManager:
         allowed = {"teacher_id","full_name","email","phone","department_id","gender","dob","address","position"}
         for key, value in kwargs.items():
             if key in allowed and value is not None:
-                cursor.execute(f"UPDATE teachers SET {key}=? WHERE id=?", (value, tid))
+                cursor.execute(f"UPDATE teachers SET {key}=? WHERE id=? OR teacher_id=?", (value, tid, tid))
         conn.commit()
         conn.close()
 
@@ -614,13 +636,13 @@ class DatabaseManager:
 
     # ---- Classes ----
     def add_class(self, class_name, department_id=None, teacher_id=None, advisor=None, room=None,
-                  schedule=None, academic_year=None, semester=None):
+                  schedule=None, academic_year=None, semester=None, year=None):
         conn = self.get_conn()
         cursor = conn.cursor()
         try:
-            cursor.execute("""INSERT INTO classes (class_name, department_id, teacher_id, advisor, room, schedule, academic_year, semester)
-                VALUES (?,?,?,?,?,?,?,?)""",
-                (class_name, department_id, teacher_id, advisor, room, schedule, academic_year, semester))
+            cursor.execute("""INSERT INTO classes (class_name, department_id, teacher_id, advisor, room, schedule, academic_year, semester, year)
+                VALUES (?,?,?,?,?,?,?,?,?)""",
+                (class_name, department_id, teacher_id, advisor, room, schedule, academic_year, semester, year))
             conn.commit()
             cid = cursor.lastrowid
             conn.close()
@@ -629,17 +651,23 @@ class DatabaseManager:
             conn.close()
             return None
 
-    def get_classes(self, department_id=None):
+    def get_classes(self, department_id=None, year=None):
         conn = self.get_conn()
         cursor = conn.cursor()
         query = """SELECT cl.*, d.name as department_name, t.full_name as teacher_name
                    FROM classes cl
                    LEFT JOIN departments d ON cl.department_id = d.id
                    LEFT JOIN teachers t ON cl.teacher_id = t.id"""
+        conditions = []
         params = []
         if department_id:
-            query += " WHERE cl.department_id=?"
+            conditions.append("cl.department_id=?")
             params.append(department_id)
+        if year:
+            conditions.append("cl.year=?")
+            params.append(year)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY cl.class_name"
         cursor.execute(query, params)
         classes = [dict(row) for row in cursor.fetchall()]
@@ -649,7 +677,7 @@ class DatabaseManager:
     def update_class(self, cid, **kwargs):
         conn = self.get_conn()
         cursor = conn.cursor()
-        allowed = {"class_name","department_id","teacher_id","advisor","room","schedule","academic_year","semester"}
+        allowed = {"class_name","department_id","teacher_id","advisor","room","schedule","academic_year","semester","year"}
         for key, value in kwargs.items():
             if key in allowed:
                 cursor.execute(f"UPDATE classes SET {key}=? WHERE id=?", (value, cid))
@@ -776,6 +804,89 @@ class DatabaseManager:
         cursor.execute("DELETE FROM attendance WHERE id=?", (att_id,))
         conn.commit()
         conn.close()
+
+    # ---- Attendance Requests ----
+    def add_attendance_request(self, student_id, course_id, request_date, request_type,
+                               reason=None, class_id=None):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO attendance_requests (student_id, course_id, class_id, request_date, request_type, reason)
+               VALUES (?,?,?,?,?,?)""",
+            (student_id, course_id, class_id, request_date, request_type, reason))
+        conn.commit()
+        req_id = cursor.lastrowid
+        conn.close()
+        return req_id
+
+    def get_attendance_requests(self, status=None, student_id=None, course_ids=None, limit=None):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        query = """SELECT r.*, s.full_name as student_name, s.student_id as sid,
+                   c.course_code, c.course_name,
+                   rv.username as reviewer_name
+                   FROM attendance_requests r
+                   JOIN students s ON r.student_id = s.id
+                   LEFT JOIN courses c ON r.course_id = c.id
+                   LEFT JOIN users rv ON r.reviewed_by = rv.id"""
+        conditions = []
+        params = []
+        if status:
+            conditions.append("r.status=?")
+            params.append(status)
+        if student_id:
+            conditions.append("r.student_id=?")
+            params.append(student_id)
+        if course_ids:
+            placeholders = ",".join("?" for _ in course_ids)
+            conditions.append(f"r.course_id IN ({placeholders})")
+            params.extend(course_ids)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY r.status = 'Pending' DESC, r.created_at DESC"
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+        cursor.execute(query, params)
+        records = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return records
+
+    def review_attendance_request(self, req_id, status, reviewed_by):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute(
+            """UPDATE attendance_requests SET status=?, reviewed_by=?, reviewed_at=?
+               WHERE id=?""",
+            (status, reviewed_by, datetime.now().isoformat(), req_id))
+        conn.commit()
+        conn.close()
+
+    def get_attendance_request(self, req_id):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM attendance_requests WHERE id=?", (req_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    def apply_attendance_request(self, req_id, reviewed_by):
+        """Approve a request: write/update the attendance record, then mark Approved."""
+        req = self.get_attendance_request(req_id)
+        if not req or req.get("status") != "Pending":
+            return False
+        target = "Present" if req.get("request_type") == "Correction" else "Excused"
+        self.take_attendance(
+            student_id=req["student_id"],
+            course_id=req["course_id"],
+            attendance_date=req["request_date"],
+            status=target,
+            taken_by=reviewed_by,
+            class_id=req.get("class_id"),
+            attendance_time=datetime.now().strftime("%H:%M:%S"),
+        )
+        self.review_attendance_request(req_id, "Approved", reviewed_by)
+        return True
 
     def get_attendance_summary(self, student_id=None, course_id=None, class_id=None,
                                start_date=None, end_date=None, month=None, year=None):
@@ -1123,37 +1234,6 @@ class DatabaseManager:
             d += timedelta(days=1)
         return trend
 
-    # ---- Face Recognition ----
-    def save_face_encoding(self, student_id, encoding):
-        conn = self.get_conn()
-        cursor = conn.cursor()
-        blob = pickle.dumps(encoding)
-        cursor.execute("""INSERT OR REPLACE INTO face_encodings (student_id, encoding)
-            VALUES (?,?)""", (student_id, blob))
-        conn.commit()
-        conn.close()
-
-    def get_face_encodings(self):
-        conn = self.get_conn()
-        cursor = conn.cursor()
-        cursor.execute("""SELECT fe.*, s.student_id, s.full_name FROM face_encodings fe
-            JOIN students s ON fe.student_id = s.id""")
-        rows = cursor.fetchall()
-        conn.close()
-        result = []
-        for row in rows:
-            d = dict(row)
-            d["encoding"] = pickle.loads(row["encoding"])
-            result.append(d)
-        return result
-
-    def delete_face_encoding(self, student_id):
-        conn = self.get_conn()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM face_encodings WHERE student_id=?", (student_id,))
-        conn.commit()
-        conn.close()
-
     # ---- Notifications ----
     def add_notification(self, student_id, type_, message):
         conn = self.get_conn()
@@ -1280,6 +1360,66 @@ class DatabaseManager:
         cursor.execute("UPDATE teachers SET user_id=? WHERE id=?", (user_id, teacher_id))
         conn.commit()
         conn.close()
+
+    # ---- Activity Logs ----
+    def log_activity(self, user_id=None, username=None, role=None, action="",
+                     module="", description=""):
+        """Record a user action in the audit log. Never raises on failure."""
+        try:
+            conn = self.get_conn()
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO activity_logs (user_id, username, role, action, module, description)
+                   VALUES (?,?,?,?,?,?)""",
+                (user_id, username, role, action, module, description))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    def get_activity_logs(self, search=None, action=None, module=None, role=None,
+                          start_date=None, end_date=None, limit=500):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        query = """SELECT * FROM activity_logs"""
+        conditions = []
+        params = []
+        if search:
+            conditions.append("(username LIKE ? OR description LIKE ? OR module LIKE ?)")
+            params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+        if action:
+            conditions.append("action=?")
+            params.append(action)
+        if module:
+            conditions.append("module=?")
+            params.append(module)
+        if role:
+            conditions.append("role=?")
+            params.append(role)
+        if start_date:
+            conditions.append("date(created_at)>=?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("date(created_at)<=?")
+            params.append(end_date)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY id DESC"
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+        cursor.execute(query, params)
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+
+    def get_log_modules(self):
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT module FROM activity_logs WHERE module != '' ORDER BY module")
+        rows = [r["module"] for r in cursor.fetchall()]
+        conn.close()
+        return rows
 
     def generate_low_attendance_notifications(self, threshold=70):
         conn = self.get_conn()

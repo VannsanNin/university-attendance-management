@@ -4,6 +4,7 @@ from database.db_manager import DatabaseManager
 from datetime import date
 from gui import theme
 from gui.sidebar import Sidebar
+from gui.activity import log
 
 class DashboardWindow(ctk.CTkToplevel):
     def __init__(self, parent, user):
@@ -51,6 +52,8 @@ class DashboardWindow(ctk.CTkToplevel):
         from gui.course_management import CourseManagementView
         from gui.class_management import ClassManagementView
         from gui.attendance_view import AttendanceView, AttendanceTakeView
+        from gui.attendance_requests_view import AttendanceRequestsView
+        from gui.activity_log_view import ActivityLogView
         from gui.reports import ReportsView
         from gui.settings_view import SettingsView
         from gui.user_management import UserManagementView
@@ -62,18 +65,20 @@ class DashboardWindow(ctk.CTkToplevel):
 
         views = {
             "dashboard": (DashboardView, [self.user, self.db, self.content_frame, self.show_frame]),
-            "users": (UserManagementView, [self.db, self.content_frame]),
-            "students": (StudentManagementView, [self.db, self.content_frame]),
-            "teachers": (TeacherManagementView, [self.db, self.content_frame]),
-            "departments": (DepartmentManagementView, [self.db, self.content_frame]),
-            "courses": (CourseManagementView, [self.db, self.content_frame]),
-            "classes": (ClassManagementView, [self.db, self.content_frame]),
+            "users": (UserManagementView, [self.db, self.content_frame, self.user]),
+            "students": (StudentManagementView, [self.db, self.content_frame, self.user]),
+            "teachers": (TeacherManagementView, [self.db, self.content_frame, self.user]),
+            "departments": (DepartmentManagementView, [self.db, self.content_frame, self.user]),
+            "courses": (CourseManagementView, [self.db, self.content_frame, self.user]),
+            "classes": (ClassManagementView, [self.db, self.content_frame, self.user]),
             "attendance": (AttendanceTakeView, [self.user, self.db, self.content_frame]),
             "reports": (ReportsView, [self.db, self.content_frame]),
-            "academic_year": (AcademicYearView, [self.db, self.content_frame]),
+            "academic_year": (AcademicYearView, [self.db, self.content_frame, self.user]),
             "settings": (SettingsView, [self.db, self.content_frame, self]),
             "take_attendance": (AttendanceTakeView, [self.user, self.db, self.content_frame]),
             "attendance_view": (AttendanceView, [self.db, self.content_frame]),
+            "attendance_requests": (AttendanceRequestsView, [self.db, self.content_frame, self.user]),
+            "activity_logs": (ActivityLogView, [self.db, self.content_frame, self.user]),
             "attendance_report": (StudentReportView, [self.db, self.content_frame, self.user]),
             "my_attendance": (AttendanceView, [self.db, self.content_frame, self.user]),
             "my_subjects": (StudentSubjectsView, [self.db, self.content_frame, self.user]),
@@ -124,6 +129,8 @@ class DashboardWindow(ctk.CTkToplevel):
                 messagebox.showerror("Error", "Password must be at least 4 characters")
                 return
             if self.db.change_password(self.user["id"], old, new):
+                log(self.db, self.user, "CHANGE_PASSWORD", "Auth",
+                    f"User '{self.user['username']}' changed their password.")
                 messagebox.showinfo("Success", "Password changed successfully")
                 dialog.destroy()
             else:
@@ -134,12 +141,14 @@ class DashboardWindow(ctk.CTkToplevel):
     def logout(self):
         from utils.session import clear_session
 
+        log(self.db, self.user, "LOGOUT", "Auth", f"User '{self.user['username']}' logged out.")
         clear_session()
         self.destroy()
         self.parent.apply_theme()
         self.parent.deiconify()
 
     def on_close(self):
+        log(self.db, self.user, "LOGOUT", "Auth", f"User '{self.user['username']}' closed the session.")
         self.destroy()
         self.parent.apply_theme()
         self.parent.deiconify()

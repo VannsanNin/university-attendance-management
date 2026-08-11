@@ -1,13 +1,15 @@
 import customtkinter as ctk
 from gui import theme
+from gui.activity import log
 from tkinter import messagebox, ttk
 from datetime import datetime
 
 
 class AcademicYearView(ctk.CTkFrame):
-    def __init__(self, db, parent):
+    def __init__(self, db, parent, user=None):
         super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
+        self.user = user
         self.pack(fill="both", expand=True)
 
         # Unified Color Palette Tokens
@@ -237,6 +239,8 @@ class AcademicYearView(ctk.CTkFrame):
             )
             conn.commit()
             messagebox.showinfo("Success", f"Academic year '{year}' Semester {semester} added successfully.")
+            log(self.db, self.user, "CREATE", "Academic Year",
+                f"Added academic year '{year}' Semester {semester}.")
             self.start_entry.delete(0, "end")
             self.end_entry.delete(0, "end")
             self.load_years()
@@ -355,6 +359,8 @@ class AcademicYearView(ctk.CTkFrame):
             conn2.commit()
             conn2.close()
             messagebox.showinfo("Success", "Academic year details updated successfully.")
+            log(self.db, self.user, "UPDATE", "Academic Year",
+                f"Updated academic year #{year_id}.")
             dialog.destroy()
             self.load_years()
 
@@ -375,6 +381,7 @@ class AcademicYearView(ctk.CTkFrame):
             cursor.execute("DELETE FROM academic_years WHERE id=?", (year_id,))
             conn.commit()
             conn.close()
+            log(self.db, self.user, "DELETE", "Academic Year", f"Deleted academic year #{year_id}.")
             self.load_years()
 
     def activate_year(self, year_id):
@@ -385,4 +392,5 @@ class AcademicYearView(ctk.CTkFrame):
         conn.commit()
         conn.close()
         messagebox.showinfo("Success", "Academic year set as Active term.")
+        log(self.db, self.user, "UPDATE", "Academic Year", f"Activated academic year #{year_id}.")
         self.load_years()

@@ -1,12 +1,15 @@
 import customtkinter as ctk
 from gui import theme
+from gui.skeleton import schedule_table_load
+from gui.activity import log
 from tkinter import messagebox, ttk
 
 
 class ClassManagementView(ctk.CTkFrame):
-    def __init__(self, db, parent):
+    def __init__(self, db, parent, user=None):
         super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
+        self.user = user
         self.selected_class_id = None
         self.pack(fill="both", expand=True)
 
@@ -15,7 +18,7 @@ class ClassManagementView(ctk.CTkFrame):
 
         self.build_ui()
         self.load_combo_data()
-        self.after(50, self.load_classes)
+        schedule_table_load(self, self.table_frame, self.load_classes)
 
     def build_ui(self):
         # -------------------------------------------------------------
@@ -100,6 +103,11 @@ class ClassManagementView(ctk.CTkFrame):
         add_field_label("Semester", 3, 0)
         self.sem_entry = ctk.CTkEntry(form_grid, height=36, corner_radius=8, placeholder_text="e.g. 1")
         self.sem_entry.grid(row=3, column=1, padx=(5, 15), pady=6, sticky="ew")
+
+        add_field_label("Study Year", 3, 2)
+        self.year_combo = ctk.CTkComboBox(form_grid, values=[""] + [str(i) for i in range(1, 5)],
+                                          height=36, corner_radius=8)
+        self.year_combo.grid(row=3, column=3, padx=(5, 15), pady=6, sticky="ew")
 
         # Toolbar Actions Inside Form Card
         btn_frame = ctk.CTkFrame(form_card, fg_color="transparent")
@@ -197,17 +205,18 @@ class ClassManagementView(ctk.CTkFrame):
             background=[("active", theme.c("table_head_active"))]
         )
 
-        columns = ("name", "department", "advisor", "room", "schedule", "total_students")
+        columns = ("name", "year", "department", "advisor", "room", "schedule", "total_students")
         self.tree = ttk.Treeview(self.table_frame, columns=columns, show="headings", style="Class.Treeview",
                                  selectmode="browse")
 
         headings = {
-            "name": ("Class Name", 160),
-            "department": ("Department", 160),
-            "advisor": ("Advisor", 140),
-            "room": ("Room", 100),
-            "schedule": ("Schedule", 160),
-            "total_students": ("Total Students", 110)
+            "name": ("Class Name", 150),
+            "year": ("Study Year", 90),
+            "department": ("Department", 150),
+            "advisor": ("Advisor", 130),
+            "room": ("Room", 90),
+            "schedule": ("Schedule", 150),
+            "total_students": ("Total Students", 100)
         }
 
         for col, (text, width) in headings.items():
@@ -248,10 +257,13 @@ class ClassManagementView(ctk.CTkFrame):
         acad_year = self.acad_year_entry.get().strip() or None
         sem_str = self.sem_entry.get().strip()
         sem = int(sem_str) if sem_str.isdigit() else None
+        year_str = self.year_combo.get().strip()
+        year = int(year_str) if year_str.isdigit() else None
 
-        result = self.db.add_class(name, dept_id, None, advisor, room, schedule, acad_year, sem)
+        result = self.db.add_class(name, dept_id, None, advisor, room, schedule, acad_year, sem, year)
         if result:
             messagebox.showinfo("Success", f"Class '{name}' created successfully.")
+            log(self.db, self.user, "CREATE", "Class", f"Created class '{name}'.")
             self.clear_form()
             self.load_classes()
         else:
@@ -336,6 +348,8 @@ class ClassManagementView(ctk.CTkFrame):
 
     def do_assign_student(self, student_id, dialog):
         self.db.add_student_to_class(self.selected_class_id, student_id)
+        log(self.db, self.user, "UPDATE", "Class",
+            f"Enrolled student (ID {student_id}) in class (ID {self.selected_class_id}).")
         dialog.destroy()
         self.load_classes()
 
@@ -382,6 +396,8 @@ class ClassManagementView(ctk.CTkFrame):
                         break
             self.db.update_class(self.selected_class_id, teacher_id=teacher_id)
             messagebox.showinfo("Success", "Teacher assigned successfully.")
+            log(self.db, self.user, "UPDATE", "Class",
+                f"Assigned teacher to class (ID {self.selected_class_id}).")
             dialog.destroy()
             self.load_classes()
 
@@ -448,6 +464,8 @@ class ClassManagementView(ctk.CTkFrame):
     def do_remove_student(self, student_id, dialog):
         if self.selected_class_id and messagebox.askyesno("Confirm Action", "Remove student from this class?"):
             self.db.remove_student_from_class(self.selected_class_id, student_id)
+            log(self.db, self.user, "UPDATE", "Class",
+                f"Removed student (ID {student_id}) from class (ID {self.selected_class_id}).")
             dialog.destroy()
             self.load_classes()
 
@@ -460,6 +478,7 @@ class ClassManagementView(ctk.CTkFrame):
         if cls and messagebox.askyesno("Confirm Deletion",
                                        f"Are you sure you want to delete class '{cls['class_name']}'?"):
             self.db.delete_class(self.selected_class_id)
+            log(self.db, self.user, "DELETE", "Class", f"Deleted class '{cls['class_name']}'.")
             self.selected_class_id = None
             self.clear_form()
             self.load_classes()
@@ -470,6 +489,7 @@ class ClassManagementView(ctk.CTkFrame):
         self.room_entry.delete(0, "end")
         self.schedule_entry.delete(0, "end")
         self.sem_entry.delete(0, "end")
+        self.year_combo.set("")
         self.dept_combo.set("")
         self.selected_class_id = None
 
@@ -485,6 +505,7 @@ class ClassManagementView(ctk.CTkFrame):
             total = len(self.db.get_class_students(cl["id"]))
             self.tree.insert("", "end", iid=str(cl["id"]), values=(
                 cl["class_name"],
+                str(cl.get("year") or "—"),
                 cl.get("department_name", "") or "—",
                 cl.get("advisor", "") or "—",
                 cl.get("room", "") or "—",
@@ -515,3 +536,4 @@ class ClassManagementView(ctk.CTkFrame):
             self.acad_year_entry.insert(0, cl.get("academic_year", "") or "")
             self.sem_entry.delete(0, "end")
             self.sem_entry.insert(0, str(cl.get("semester", "") or ""))
+            self.year_combo.set(str(cl.get("year") or ""))

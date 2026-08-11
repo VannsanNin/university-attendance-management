@@ -1,5 +1,7 @@
 import customtkinter as ctk
 from gui import theme
+from gui.skeleton import schedule_table_load
+from gui.activity import log
 from tkinter import messagebox, filedialog, ttk
 from PIL import Image
 import os
@@ -7,9 +9,10 @@ import pandas as pd
 
 
 class StudentManagementView(ctk.CTkFrame):
-    def __init__(self, db, parent):
+    def __init__(self, db, parent, user=None):
         super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
+        self.user = user
         self.photo_path = None
         self.selected_student_id = None
         self.pack(fill="both", expand=True)
@@ -18,7 +21,7 @@ class StudentManagementView(ctk.CTkFrame):
         self.colors = theme.colors
 
         self.build_ui()
-        self.after(50, self.load_students)
+        schedule_table_load(self, self.table_frame, self.load_students)
 
     def build_ui(self):
         # -------------------------------------------------------------
@@ -171,18 +174,19 @@ class StudentManagementView(ctk.CTkFrame):
             background=[("active", theme.c("table_head_active"))]
         )
 
-        columns = ("id", "name", "gender", "department", "class", "phone", "email")
+        columns = ("id", "name", "gender", "department", "year", "class", "phone", "email")
         self.tree = ttk.Treeview(self.table_frame, columns=columns, show="headings", style="Student.Treeview",
                                  selectmode="browse")
 
         headings = {
             "id": ("ID", 70),
-            "name": ("Full Name", 180),
+            "name": ("Full Name", 170),
             "gender": ("Gender", 80),
-            "department": ("Department", 160),
+            "department": ("Department", 150),
+            "year": ("Year", 55),
             "class": ("Class", 110),
-            "phone": ("Phone", 120),
-            "email": ("Email Address", 200)
+            "phone": ("Phone", 115),
+            "email": ("Email Address", 190)
         }
 
         for col, (text, width) in headings.items():
@@ -269,8 +273,9 @@ class StudentManagementView(ctk.CTkFrame):
         self.program_entry.grid(row=0, column=3, padx=(5, 15), pady=8, sticky="ew")
 
         add_lbl("Year:", 1, 0)
-        self.year_entry = ctk.CTkEntry(f, height=34, corner_radius=8)
-        self.year_entry.grid(row=1, column=1, padx=(5, 15), pady=8, sticky="ew")
+        self.year_combo = ctk.CTkComboBox(f, values=[""] + [str(i) for i in range(1, 5)],
+                                          height=34, corner_radius=8)
+        self.year_combo.grid(row=1, column=1, padx=(5, 15), pady=8, sticky="ew")
 
         add_lbl("Semester:", 1, 2)
         self.semester_entry = ctk.CTkEntry(f, height=34, corner_radius=8)
@@ -361,7 +366,7 @@ class StudentManagementView(ctk.CTkFrame):
             except Exception:
                 photo_dest = None
 
-        year_str = self.year_entry.get().strip()
+        year_str = self.year_combo.get().strip()
         year = int(year_str) if year_str.isdigit() else None
         sem_str = self.semester_entry.get().strip()
         sem = int(sem_str) if sem_str.isdigit() else None
@@ -394,6 +399,7 @@ class StudentManagementView(ctk.CTkFrame):
             if user_id:
                 self.db.link_student_user(result, user_id)
             messagebox.showinfo("Success", f"Student '{full}' added successfully.")
+            log(self.db, self.user, "CREATE", "Student", f"Added student {sid} '{full}'.")
             self.clear_form()
             self.load_students()
         else:
@@ -462,7 +468,10 @@ class StudentManagementView(ctk.CTkFrame):
         for i, (key, label) in enumerate(acad_fields, start=1):
             ctk.CTkLabel(tab2, text=label + ":", text_color=self.colors["text_muted"]).grid(row=i, column=0, padx=5,
                                                                                             pady=5, sticky="e")
-            e = ctk.CTkEntry(tab2, width=220, height=32)
+            if key == "year":
+                e = ctk.CTkComboBox(tab2, width=220, values=[""] + [str(v) for v in range(1, 5)], height=32)
+            else:
+                e = ctk.CTkEntry(tab2, width=220, height=32)
             e.insert(0, str(student.get(key, "") or ""))
             e.grid(row=i, column=1, padx=5, pady=5, sticky="w")
             entries[key] = e
@@ -504,6 +513,8 @@ class StudentManagementView(ctk.CTkFrame):
                 kwargs["department_id"] = None
 
             self.db.update_student(self.selected_student_id, **kwargs)
+            log(self.db, self.user, "UPDATE", "Student",
+                f"Updated student '{student.get('full_name', student.get('student_id'))}'.")
             messagebox.showinfo("Success", "Student information updated successfully.")
             dialog.destroy()
             self.load_students()
@@ -525,6 +536,8 @@ class StudentManagementView(ctk.CTkFrame):
         if student and messagebox.askyesno("Confirm Deletion",
                                            f"Permanently delete student record '{student['full_name']}'?"):
             self.db.delete_student(self.selected_student_id)
+            log(self.db, self.user, "DELETE", "Student",
+                f"Deleted student '{student.get('full_name')}' ({student.get('student_id')}).")
             self.selected_student_id = None
             self.load_students()
 
@@ -535,7 +548,7 @@ class StudentManagementView(ctk.CTkFrame):
             else:
                 w.delete(0, "end")
         self.program_entry.delete(0, "end")
-        self.year_entry.delete(0, "end")
+        self.year_combo.set("")
         self.semester_entry.delete(0, "end")
         self.guardian_name_entry.delete(0, "end")
         self.guardian_phone_entry.delete(0, "end")
@@ -556,6 +569,7 @@ class StudentManagementView(ctk.CTkFrame):
                 s["full_name"],
                 s.get("gender", "") or "—",
                 s.get("department_name", "") or "—",
+                str(s.get("year") or "—"),
                 s.get("class_name", "") or "—",
                 s.get("phone", "") or "—",
                 s.get("email", "") or "—"
@@ -625,6 +639,7 @@ class StudentManagementView(ctk.CTkFrame):
                         self.db.link_student_user(result, user_id)
                     count += 1
             messagebox.showinfo("Success", f"Successfully imported {count} student records.")
+            log(self.db, self.user, "IMPORT", "Student", f"Imported {count} students from Excel.")
             self.load_students()
         except Exception as e:
             messagebox.showerror("Import Error", f"Failed to import Excel data: {e}")

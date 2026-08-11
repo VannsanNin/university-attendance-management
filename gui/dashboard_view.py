@@ -6,6 +6,7 @@ from tkinter import Canvas
 import customtkinter as ctk
 
 from gui import theme
+from gui.skeleton import SkeletonFrame, build_dashboard_skeleton
 
 # ---------------------------------------------------------------------------
 # Small schedule helper — parses text like "Mon/Wed 08:00-10:00" into
@@ -183,12 +184,32 @@ class _BaseDashboard(ctk.CTkFrame):
         self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.scroll.pack(fill="both", expand=True, padx=30, pady=20)
 
+        self._skeleton = None
+        self._show_skeleton()
+        self.after(550, self._render_all)
+
+    def _show_skeleton(self):
+        self._skeleton = SkeletonFrame(self.scroll, fg_color="transparent")
+        self._skeleton.pack(fill="both", expand=True)
+        build_dashboard_skeleton(self._skeleton)
+        self._skeleton.start()
+
+    def _render_all(self):
+        try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+        if self._skeleton is not None:
+            self._skeleton.destroy()
+            self._skeleton = None
         self._build_all()
 
     def _refresh(self):
         for w in self.scroll.winfo_children():
             w.destroy()
-        self._build_all()
+        self._show_skeleton()
+        self.after(350, self._render_all)
 
     # ---------- primitives ----------
     def _build_header(self, title, subtitle=None):
@@ -286,27 +307,97 @@ class _BaseDashboard(ctk.CTkFrame):
             self._empty_state(card, "No attendance records yet.")
             return card
 
-        body = ctk.CTkFrame(card, fg_color="transparent")
+        body = ctk.CTkScrollableFrame(card, fg_color="transparent", height=300)
         body.pack(fill="x", padx=16, pady=(0, 14))
+        body.pack_propagate(False)
+        self._build_activity_timeline(body, records, limit)
+        return card
 
-        for r in records[:limit]:
+    # ---------- styled schedule rows ----------
+    def _build_schedule_list(self, card, rows, limit=8):
+        if not rows:
+            self._empty_state(card, "No classes scheduled for today.")
+            return
+        body = ctk.CTkFrame(card, fg_color="transparent")
+        body.pack(fill="x", padx=16, pady=(2, 14))
+        for r in rows[:limit]:
+            self._schedule_item(body, r)
+
+    def _schedule_item(self, parent, row):
+        item = ctk.CTkFrame(parent, fg_color="transparent")
+        item.pack(fill="x", pady=(0, 8))
+
+        time_box = ctk.CTkFrame(item, fg_color=theme.c("border_alt"), corner_radius=8,
+                                width=96, height=40)
+        time_box.pack(side="left")
+        time_box.pack_propagate(False)
+        ctk.CTkLabel(time_box, text=row.get("time") or "\u2014",
+                     font=ctk.CTkFont(size=12, weight="bold"),
+                     text_color=theme.c("text_body")
+                     ).place(relx=0.5, rely=0.5, anchor="center")
+
+        status = row.get("status") or ""
+        color = self._status_badge(status)
+        pill = ctk.CTkFrame(item, fg_color="transparent", corner_radius=10,
+                            border_width=1, border_color=color)
+        pill.pack(side="right")
+        ctk.CTkLabel(pill, text=status, font=ctk.CTkFont(size=10, weight="bold"),
+                     text_color=color).pack(padx=10, pady=4)
+
+        info = ctk.CTkFrame(item, fg_color="transparent")
+        info.pack(side="left", fill="x", expand=True, padx=(12, 8))
+        ctk.CTkLabel(info, text=row.get("name") or "\u2014",
+                     font=ctk.CTkFont(size=13, weight="bold"),
+                     text_color=theme.c("text_bright"), anchor="w").pack(fill="x")
+        meta_parts = [p for p in (row.get("teacher"), row.get("room"))
+                      if p and p != "\u2014"]
+        if meta_parts:
+            ctk.CTkLabel(info, text=" \u00B7 ".join(meta_parts),
+                         font=ctk.CTkFont(size=11), text_color=theme.c("text_table"),
+                         anchor="w").pack(fill="x", pady=(2, 0))
+
+    # ---------- styled recent activity timeline ----------
+    def _build_activity_timeline(self, parent, records, limit=9):
+        shown = records[:limit]
+        for i, r in enumerate(shown):
+            is_last = i == len(shown) - 1
+            row = ctk.CTkFrame(parent, fg_color="transparent")
+            row.pack(fill="x")
+
+            rail = ctk.CTkFrame(row, width=18, fg_color="transparent")
+            rail.pack(side="left", fill="y")
+            rail.pack_propagate(False)
+            dot = ctk.CTkFrame(rail, width=10, height=10, corner_radius=5,
+                               fg_color=self._status_badge(r.get("status") or ""))
+            dot.pack(pady=(6, 0))
+            if not is_last:
+                line = ctk.CTkFrame(rail, width=2, fg_color=theme.c("border_alt"))
+                line.pack(fill="y", expand=True)
+
+            content = ctk.CTkFrame(row, fg_color="transparent")
+            content.pack(side="left", fill="x", expand=True, padx=(10, 0), pady=(2, 6))
+
+            top = ctk.CTkFrame(content, fg_color="transparent")
+            top.pack(fill="x")
             status = r.get("status") or ""
-            color = self._status_badge(status)
-            dot = ctk.CTkFrame(body, fg_color=color, width=10, height=10, corner_radius=5)
-            dot.pack(side="left", pady=9)
-            dot.pack_propagate(False)
-
-            line = ctk.CTkFrame(body, fg_color="transparent")
-            line.pack(fill="x", pady=3)
-            text = f"{status} \u2014 {r.get('student_name') or r.get('sid') or '?'}"
+            ctk.CTkLabel(top, text=status,
+                         font=ctk.CTkFont(size=12, weight="bold"),
+                         text_color=self._status_badge(status)).pack(side="left")
+            text = r.get("student_name") or r.get("sid") or "?"
             if r.get("course_code"):
                 text += f" \u00B7 {r['course_code']}"
-            ctk.CTkLabel(line, text=text, font=ctk.CTkFont(size=12),
-                         text_color=theme.c("text_body"), anchor="w").pack(side="left", padx=(6, 0))
+            ctk.CTkLabel(top, text=text, font=ctk.CTkFont(size=12),
+                         text_color=theme.c("text_body")).pack(side="left", padx=(6, 0))
             when = r.get("attendance_time") or r.get("attendance_date") or ""
-            ctk.CTkLabel(line, text=when, font=ctk.CTkFont(size=11),
+            ctk.CTkLabel(top, text=when, font=ctk.CTkFont(size=11),
                          text_color=theme.c("text_table")).pack(side="right")
-        return card
+
+    def _activity_scroll_body(self, parent, records, limit, height=320):
+        body = ctk.CTkScrollableFrame(parent, fg_color="transparent", height=height)
+        body.pack(fill="x", padx=16, pady=(2, 14))
+        body.pack_propagate(False)
+        self._build_activity_timeline(body, records, limit)
+        return body
 
 
 # ---------------------------------------------------------------------------
@@ -522,20 +613,7 @@ class AdminDashboardView(_BaseDashboard):
         if not rows:
             self._empty_state(sched_card, "No classes scheduled for today.\nUse Take Attendance to start a session.")
         else:
-            body = ctk.CTkFrame(sched_card, fg_color="transparent")
-            body.pack(fill="x", padx=16, pady=(0, 14))
-            for r in rows[:8]:
-                item = ctk.CTkFrame(body, fg_color=theme.c("border_alt"), corner_radius=6)
-                item.pack(fill="x", pady=2)
-                ctk.CTkLabel(item, text=r["time"], width=90, anchor="w", font=ctk.CTkFont(size=12),
-                             text_color=theme.c("text_body")).pack(side="left", padx=8, pady=7)
-                ctk.CTkLabel(item, text=r["name"], width=170, anchor="w",
-                             font=ctk.CTkFont(size=12, weight="bold"),
-                             text_color=theme.c("text_bright")).pack(side="left", padx=4, pady=7)
-                ctk.CTkLabel(item, text=r["teacher"], width=140, anchor="w", font=ctk.CTkFont(size=11),
-                             text_color=theme.c("text_body")).pack(side="left", padx=4, pady=7)
-                ctk.CTkLabel(item, text=r["status"], font=ctk.CTkFont(size=11, weight="bold"),
-                             text_color=self._status_badge(r["status"])).pack(side="right", padx=10, pady=7)
+            self._build_schedule_list(sched_card, rows)
 
         records = self.db.get_attendance(limit=10)
         act_card = ctk.CTkFrame(grid, fg_color=theme.c("card_alt"), corner_radius=12,
@@ -548,23 +626,7 @@ class AdminDashboardView(_BaseDashboard):
         if not records:
             self._empty_state(act_card, "No attendance records yet.")
         else:
-            body = ctk.CTkFrame(act_card, fg_color="transparent")
-            body.pack(fill="x", padx=16, pady=(0, 14))
-            for r in records[:9]:
-                status = r.get("status") or ""
-                color = self._status_badge(status)
-                dot = ctk.CTkFrame(body, fg_color=color, width=10, height=10, corner_radius=5)
-                dot.pack(side="left", pady=9)
-                dot.pack_propagate(False)
-                line = ctk.CTkFrame(body, fg_color="transparent")
-                line.pack(fill="x", pady=3)
-                text = f"{status} \u2014 {r.get('student_name') or r.get('sid')}"
-                if r.get("course_code"):
-                    text += f" \u00B7 {r['course_code']}"
-                ctk.CTkLabel(line, text=text, font=ctk.CTkFont(size=12),
-                             text_color=theme.c("text_body"), anchor="w").pack(side="left", padx=(6, 0))
-                ctk.CTkLabel(line, text=r.get("attendance_time") or r.get("attendance_date") or "",
-                             font=ctk.CTkFont(size=11), text_color=theme.c("text_table")).pack(side="right")
+            self._activity_scroll_body(act_card, records, 9)
 
     # ---------- department stats + calendar ----------
     def _build_dept_and_calendar(self):
@@ -885,20 +947,7 @@ class TeacherDashboardView(_BaseDashboard):
         if not rows:
             self._empty_state(sched_card, "No classes scheduled for you today.")
         else:
-            body = ctk.CTkFrame(sched_card, fg_color="transparent")
-            body.pack(fill="x", padx=16, pady=(0, 14))
-            for r in rows[:8]:
-                item = ctk.CTkFrame(body, fg_color=theme.c("border_alt"), corner_radius=6)
-                item.pack(fill="x", pady=2)
-                ctk.CTkLabel(item, text=r["time"], width=90, anchor="w", font=ctk.CTkFont(size=12),
-                             text_color=theme.c("text_body")).pack(side="left", padx=8, pady=7)
-                ctk.CTkLabel(item, text=r["name"], width=180, anchor="w",
-                             font=ctk.CTkFont(size=12, weight="bold"),
-                             text_color=theme.c("text_bright")).pack(side="left", padx=4, pady=7)
-                ctk.CTkLabel(item, text=r["room"], width=90, anchor="w", font=ctk.CTkFont(size=11),
-                             text_color=theme.c("text_body")).pack(side="left", padx=4, pady=7)
-                ctk.CTkLabel(item, text=r["status"], font=ctk.CTkFont(size=11, weight="bold"),
-                             text_color=self._status_badge(r["status"])).pack(side="right", padx=10, pady=7)
+            self._build_schedule_list(sched_card, rows)
 
             ctk.CTkButton(sched_card, text="\u2705 Quick Take Attendance",
                           fg_color=theme.c("primary"), hover_color=theme.c("primary_hover"),
@@ -920,23 +969,7 @@ class TeacherDashboardView(_BaseDashboard):
         if not records:
             self._empty_state(act_card, "No attendance sessions yet.")
         else:
-            body = ctk.CTkFrame(act_card, fg_color="transparent")
-            body.pack(fill="x", padx=16, pady=(0, 14))
-            for r in records[:9]:
-                status = r.get("status") or ""
-                color = self._status_badge(status)
-                dot = ctk.CTkFrame(body, fg_color=color, width=10, height=10, corner_radius=5)
-                dot.pack(side="left", pady=9)
-                dot.pack_propagate(False)
-                line = ctk.CTkFrame(body, fg_color="transparent")
-                line.pack(fill="x", pady=3)
-                text = f"{status} \u2014 {r.get('student_name') or r.get('sid')}"
-                if r.get("course_code"):
-                    text += f" \u00B7 {r['course_code']}"
-                ctk.CTkLabel(line, text=text, font=ctk.CTkFont(size=12),
-                             text_color=theme.c("text_body"), anchor="w").pack(side="left", padx=(6, 0))
-                ctk.CTkLabel(line, text=r.get("attendance_time") or r.get("attendance_date") or "",
-                             font=ctk.CTkFont(size=11), text_color=theme.c("text_table")).pack(side="right")
+            self._activity_scroll_body(act_card, records, 9)
 
     def _get_teacher_today_rows(self):
         rows = []
@@ -1074,20 +1107,7 @@ class StudentDashboardView(_BaseDashboard):
         if not rows:
             self._empty_state(sched_card, "No classes scheduled for you today.")
         else:
-            body = ctk.CTkFrame(sched_card, fg_color="transparent")
-            body.pack(fill="x", padx=16, pady=(0, 14))
-            for r in rows[:8]:
-                item = ctk.CTkFrame(body, fg_color=theme.c("border_alt"), corner_radius=6)
-                item.pack(fill="x", pady=2)
-                ctk.CTkLabel(item, text=r["time"], width=90, anchor="w", font=ctk.CTkFont(size=12),
-                             text_color=theme.c("text_body")).pack(side="left", padx=8, pady=7)
-                ctk.CTkLabel(item, text=r["name"], width=180, anchor="w",
-                             font=ctk.CTkFont(size=12, weight="bold"),
-                             text_color=theme.c("text_bright")).pack(side="left", padx=4, pady=7)
-                ctk.CTkLabel(item, text=r["teacher"], width=150, anchor="w", font=ctk.CTkFont(size=11),
-                             text_color=theme.c("text_body")).pack(side="left", padx=4, pady=7)
-                ctk.CTkLabel(item, text=r["status"], font=ctk.CTkFont(size=11, weight="bold"),
-                             text_color=self._status_badge(r["status"])).pack(side="right", padx=10, pady=7)
+            self._build_schedule_list(sched_card, rows)
 
         today = date.today()
         days = self.db.get_attendance_calendar(year=today.year, month=today.month)

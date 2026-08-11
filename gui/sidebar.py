@@ -1,6 +1,33 @@
 import customtkinter as ctk
 
 from gui import theme
+from gui.icons import icon
+
+NAV_ICONS = {
+    "dashboard": "dashboard",
+    "users": "members",
+    "students": "members",
+    "teachers": "profile",
+    "departments": "reservations",
+    "courses": "books",
+    "classes": "book_icon",
+    "attendance": "fines",
+    "reports": "reports",
+    "academic_year": "reservations",
+    "settings": "settings",
+    "take_attendance": "fines",
+    "attendance_view": "fines",
+    "attendance_requests": "fines",
+    "activity_logs": "reports",
+    "attendance_report": "reports",
+    "my_attendance": "fines",
+    "my_subjects": "books",
+    "my_classes": "book_icon",
+    "my_courses": "books",
+    "admin_profile": "profile",
+    "teacher_profile": "profile",
+    "student_profile": "profile",
+}
 
 
 class Sidebar(ctk.CTkFrame):
@@ -89,9 +116,12 @@ class Sidebar(ctk.CTkFrame):
                 continue
 
             is_subitem = label.startswith("    \u2022")
+            label = label.strip()
             btn = ctk.CTkButton(
                 scroll_frame,
                 text=label,
+                image=icon(NAV_ICONS.get(key)),
+                compound="left",
                 anchor="w",
                 height=34 if is_subitem else 38,
                 corner_radius=8,
@@ -101,7 +131,7 @@ class Sidebar(ctk.CTkFrame):
                 font=ctk.CTkFont(size=11 if is_subitem else 12, weight="normal" if is_subitem else "bold"),
                 command=lambda k=key: self.on_navigate(k),
             )
-            btn.pack(fill="x", pady=1)
+            btn.pack(fill="x", pady=1, padx=2)
             self.nav_buttons[key] = btn
 
         # -------------------------------------------------------------
@@ -152,7 +182,9 @@ class Sidebar(ctk.CTkFrame):
                 ("classes",        "  Class Management"),
                 (None, "---"),
                 ("attendance",     "  Attendance Management"),
+                ("attendance_requests", "    \u2022 Student Requests"),
                 ("reports",        "  Reports"),
+                ("activity_logs",  "  Activity Logs"),
                 (None, "---"),
                 ("academic_year",  "  Academic Year / Semester"),
                 ("settings",       "  Settings"),
@@ -168,6 +200,7 @@ class Sidebar(ctk.CTkFrame):
                 (None, "---"),
                 ("take_attendance", "  Take Attendance"),
                 ("attendance_view", "  Attendance History"),
+                ("attendance_requests", "    \u2022 Student Requests"),
                 (None, "---"),
                 ("reports",         "  Reports"),
                 ("teacher_profile", "  My Profile"),
@@ -177,6 +210,7 @@ class Sidebar(ctk.CTkFrame):
                 ("dashboard",         "  Dashboard"),
                 (None, "---"),
                 ("my_attendance",     "  My Attendance"),
+                ("attendance_requests", "    \u2022 My Requests"),
                 ("attendance_report", "  Attendance Report"),
                 ("my_subjects",       "  My Subjects"),
                 (None, "---"),

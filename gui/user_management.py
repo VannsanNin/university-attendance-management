@@ -1,12 +1,15 @@
 import customtkinter as ctk
 from gui import theme
+from gui.skeleton import schedule_table_load
+from gui.activity import log
 from tkinter import messagebox, ttk
 
 
 class UserManagementView(ctk.CTkFrame):
-    def __init__(self, db, parent):
+    def __init__(self, db, parent, user=None):
         super().__init__(parent, fg_color=theme.c("bg_dark"))  # Slate 900 background
         self.db = db
+        self.user = user
         self.pack(fill="both", expand=True)
         self.selected_user_id = None
         self._search_after_id = None
@@ -15,7 +18,7 @@ class UserManagementView(ctk.CTkFrame):
         self.colors = theme.colors
 
         self.build_ui()
-        self.after(50, self.load_users)
+        schedule_table_load(self, self.table_wrapper, self.load_users)
 
     def build_ui(self):
         # Header Section
@@ -206,6 +209,7 @@ class UserManagementView(ctk.CTkFrame):
         # Custom Styled Treeview Table
         table_wrapper = ctk.CTkFrame(table_card, fg_color="transparent")
         table_wrapper.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        self.table_wrapper = table_wrapper
 
         style = ttk.Style()
         style.theme_use("default")
@@ -299,6 +303,7 @@ class UserManagementView(ctk.CTkFrame):
                 self.db.link_teacher_user(linked_id, user_id)
 
         messagebox.showinfo("Success", f"User account '{username}' created successfully!")
+        log(self.db, self.user, "CREATE", "User", f"Created {role} account '{username}'.")
         self.username_entry.delete(0, "end")
         self.password_entry.delete(0, "end")
         self.email_entry.delete(0, "end")
@@ -397,6 +402,7 @@ class UserManagementView(ctk.CTkFrame):
             self.db.update_user(uid, email=email_e.get().strip() or None, role=role_var.get(),
                                 is_active=int(active_var.get()))
             self.db.update_user(uid, phone=phone_e.get().strip() or None)
+            log(self.db, self.user, "UPDATE", "User", f"Updated account '{user['username']}'.")
             messagebox.showinfo("Success", "User details updated successfully.")
             dialog.destroy()
             self.load_users()
@@ -457,6 +463,7 @@ class UserManagementView(ctk.CTkFrame):
                 messagebox.showerror("Validation Error", "Passwords do not match.")
                 return
             self.db.update_user_password(uid, np_)
+            log(self.db, self.user, "RESET_PASSWORD", "User", f"Reset password for user '{user['username']}'.")
             messagebox.showinfo("Success", "Password updated successfully.")
             dialog.destroy()
 
@@ -479,4 +486,5 @@ class UserManagementView(ctk.CTkFrame):
         if messagebox.askyesno("Confirm Action",
                                f"Are you sure you want to permanently delete user '{user['username']}'?"):
             self.db.delete_user(uid)
+            log(self.db, self.user, "DELETE", "User", f"Deleted account '{user['username']}'.")
             self.load_users()
