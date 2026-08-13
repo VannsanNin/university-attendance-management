@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from gui import theme
 from gui.activity import log
+from gui.skeleton import safe_grab
 from tkinter import messagebox, filedialog, ttk
 from datetime import date, datetime
 import pandas as pd
@@ -630,7 +631,7 @@ class AttendanceView(ctk.CTkFrame):
         dialog.geometry("340x220")
         dialog.configure(fg_color=self.colors["bg_dark"])
         dialog.transient(self)
-        dialog.after(100, dialog.grab_set)
+        safe_grab(dialog)
 
         card = ctk.CTkFrame(dialog, fg_color=self.colors["card_bg"], corner_radius=12)
         card.pack(fill="both", expand=True, padx=15, pady=15)
@@ -753,10 +754,16 @@ class AttendanceView(ctk.CTkFrame):
             kwargs["status"] = status
 
         if self.user and self.user.get("role") == "student":
-            students = self.db.get_students()
-            for s in students:
-                if s.get("user_id") == self.user.get("id") or s.get("email") == self.user.get("email"):
+            uid = self.user.get("id")
+            uemail = (self.user.get("email") or "").strip().lower()
+            uname = (self.user.get("username") or "").strip().lower()
+            for s in self.db.get_students():
+                if (s.get("user_id") == uid
+                        or (uemail and (s.get("email") or "").strip().lower() == uemail)
+                        or (uname and uname == (s.get("student_id") or "").strip().lower())):
                     kwargs["student_id"] = s["id"]
                     break
+            else:
+                return []
 
         return self.db.get_attendance(**kwargs)

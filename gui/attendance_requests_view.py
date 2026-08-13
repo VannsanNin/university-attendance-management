@@ -4,7 +4,7 @@ from datetime import date
 
 from gui import theme
 from gui.activity import log
-from gui.skeleton import schedule_table_load
+from gui.skeleton import schedule_table_load, safe_grab
 
 STATUS_COLORS = {
     "Pending": theme.c("warning"),
@@ -279,10 +279,10 @@ class AttendanceRequestsView(ctk.CTkFrame):
 
         dialog = ctk.CTkToplevel(self)
         dialog.title("Request Attendance")
-        dialog.geometry("460x430")
+        dialog.geometry("460x620")
         dialog.configure(fg_color=self.colors["bg_dark"])
         dialog.transient(self)
-        dialog.after(100, dialog.grab_set)
+        safe_grab(dialog)
 
         card = ctk.CTkFrame(dialog, fg_color=self.colors["card_bg"], corner_radius=12)
         card.pack(fill="both", expand=True, padx=15, pady=15)

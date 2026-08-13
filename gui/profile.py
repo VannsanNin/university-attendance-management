@@ -5,6 +5,7 @@ from PIL import Image
 from tkinter import messagebox
 
 from gui import theme
+from gui.skeleton import safe_grab
 
 
 def _fmt(value):
@@ -213,7 +214,7 @@ class BaseProfileView(ctk.CTkFrame):
         dialog.geometry("440x560")
         dialog.configure(fg_color=theme.c("bg_dark"))
         dialog.transient(self.winfo_toplevel())
-        dialog.grab_set()
+        safe_grab(dialog)
 
         ctk.CTkLabel(dialog, text=title, font=ctk.CTkFont(size=16, weight="bold"),
                      text_color=theme.c("text_bright")).pack(anchor="w", padx=22, pady=(18, 0))

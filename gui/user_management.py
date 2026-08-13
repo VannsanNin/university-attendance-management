@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from gui import theme
-from gui.skeleton import schedule_table_load
+from gui.skeleton import schedule_table_load, safe_grab
 from gui.activity import log
 from tkinter import messagebox, ttk
 
@@ -366,7 +366,7 @@ class UserManagementView(ctk.CTkFrame):
         dialog.geometry("400x380")
         dialog.configure(fg_color=self.colors["bg_dark"])
         dialog.transient(self)
-        dialog.after(100, dialog.grab_set)
+        safe_grab(dialog)
 
         card = ctk.CTkFrame(dialog, fg_color=self.colors["card_bg"], corner_radius=12)
         card.pack(fill="both", expand=True, padx=15, pady=15)
@@ -426,7 +426,7 @@ class UserManagementView(ctk.CTkFrame):
         dialog.geometry("380x300")
         dialog.configure(fg_color=self.colors["bg_dark"])
         dialog.transient(self)
-        dialog.after(100, dialog.grab_set)
+        safe_grab(dialog)
 
         card = ctk.CTkFrame(dialog, fg_color=self.colors["card_bg"], corner_radius=12)
         card.pack(fill="both", expand=True, padx=15, pady=15)

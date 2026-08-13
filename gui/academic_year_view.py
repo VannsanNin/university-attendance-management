@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from gui import theme
 from gui.activity import log
+from gui.skeleton import safe_grab
 from tkinter import messagebox, ttk
 from datetime import datetime
 
@@ -308,7 +309,7 @@ class AcademicYearView(ctk.CTkFrame):
         dialog.geometry("420x260")
         dialog.configure(fg_color=self.colors["bg_dark"])
         dialog.transient(self)
-        dialog.after(100, dialog.grab_set)
+        safe_grab(dialog)
 
         card = ctk.CTkFrame(dialog, fg_color=self.colors["card_bg"], corner_radius=12)
         card.pack(fill="both", expand=True, padx=15, pady=15)

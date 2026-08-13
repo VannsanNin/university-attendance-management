@@ -100,6 +100,20 @@ def build_table_skeleton(frame):
         frame.bar(frame, height=16).pack(padx=20, pady=7)
 
 
+def safe_grab(dialog, delay=10):
+    """Set a modal grab on ``dialog`` without crashing if it is closed or not
+    yet viewable when the grab fires (Tk raises TclError in those cases)."""
+    def _grab():
+        try:
+            if not dialog.winfo_exists():
+                return
+            dialog.wait_visibility()
+            dialog.grab_set()
+        except Exception:
+            pass
+    dialog.after(delay, _grab)
+
+
 def schedule_table_load(owner, container, load_cb, min_delay=650):
     """Overlay a skeleton table in ``container`` for ``min_delay`` ms, then load."""
     sk = SkeletonFrame(container, fg_color="transparent")

@@ -919,7 +919,7 @@ class DatabaseManager:
             SUM(CASE WHEN a.status='Excused' THEN 1 ELSE 0 END) as excused_count
             FROM attendance a WHERE {where}"""
         cursor.execute(query, params)
-        summary = dict(cursor.fetchone())
+        summary = {k: (v or 0) for k, v in dict(cursor.fetchone()).items()}
         conn.close()
         if summary["total"] and summary["total"] > 0:
             summary["percentage"] = round((summary["present_count"] + summary["late_count"] + summary["permission_count"] + summary.get("excused_count", 0)) / summary["total"] * 100, 1)
